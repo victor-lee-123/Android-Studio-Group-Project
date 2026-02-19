@@ -76,4 +76,7 @@ dependencies {
 
     // ListenableFuture (Guava concurrent Lib)
     implementation("com.google.guava:guava:32.1.3-android")
+
+    // Coil (To show photo preview)
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

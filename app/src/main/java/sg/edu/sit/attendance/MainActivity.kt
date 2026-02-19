@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import sg.edu.sit.attendance.camera.PhotoCaptureScreen
 import sg.edu.sit.attendance.data.DbProvider
 import sg.edu.sit.attendance.data.SessionEntity
 import sg.edu.sit.attendance.qr.QrCamerascreen
@@ -55,28 +56,29 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
     LaunchedEffect(Unit) {
         val dao = DbProvider.get(ctx).dao()
         val demo = SessionEntity(
-            sessionId = "demo-session",
-            groupId = "demo-group",
-            title = "Demo Session",
-            startTimeMs = System.currentTimeMillis() - 60_000,
-            endTimeMs = System.currentTimeMillis() + 60 * 60_000,
-            fenceLat = null,
-            fenceLng = null,
+            sessionId    = "demo-session",
+            groupId      = "demo-group",
+            title        = "Demo Session",
+            startTimeMs  = System.currentTimeMillis() - 60_000,
+            endTimeMs    = System.currentTimeMillis() + 60 * 60_000,
+            fenceLat     = null,
+            fenceLng     = null,
             fenceRadiusM = null,
             qrCodePayload = "ATTEND:demo-session",
-            createdByUid = "teacher",
+            createdByUid  = "teacher",
         )
         dao.upsertSession(demo)
     }
 
     val sessions by vm.sessions.collectAsState()
 
-    var scannedQr by remember { mutableStateOf<String?>(null) }
+    var scannedQr    by remember { mutableStateOf<String?>(null) }
     var lastLocation by remember { mutableStateOf<Location?>(null) }
-    var photoUri by remember { mutableStateOf<String?>(null) }
+    var photoUri     by remember { mutableStateOf<String?>(null) }
 
-    // ── NEW: controls whether QR scanner screen is shown ──
-    var showQrScanner by remember { mutableStateOf(false) }
+    // ── Screen navigation states ──
+    var showQrScanner    by remember { mutableStateOf(false) }
+    var showPhotoCapture by remember { mutableStateOf(false) }
 
     // Grab last known location
     LaunchedEffect(Unit) {
@@ -86,18 +88,28 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
         }
     }
 
-    // ── If QR scanner is open, show it full screen ──
+    // ── QR Scanner screen ──
     if (showQrScanner) {
         QrCamerascreen(
             onQrScanned = { raw ->
-                scannedQr = raw         // save the scanned value
-                showQrScanner = false   // go back to main screen
+                scannedQr     = raw
+                showQrScanner = false
             },
-            onBack = {
-                showQrScanner = false   // user pressed back arrow
-            }
+            onBack = { showQrScanner = false }
         )
-        return // stop rendering the rest of this screen
+        return
+    }
+
+    // ── Photo Capture screen ──
+    if (showPhotoCapture) {
+        PhotoCaptureScreen(
+            onPhotoCaptured = { uri ->
+                photoUri         = uri
+                showPhotoCapture = false
+            },
+            onBack = { showPhotoCapture = false }
+        )
+        return
     }
 
     // ── Main screen ──
@@ -117,17 +129,17 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
                     Spacer(Modifier.height(8.dp))
 
                     Row {
-                        // ── REPLACED: now opens real QR camera ──
+                        // Real QR scanner
                         Button(
                             onClick = { showQrScanner = true }
                         ) { Text("Scan QR Code") }
 
                         Spacer(Modifier.width(8.dp))
 
-                        // Simulate photo still (will replace later)
+                        // Real photo capture
                         Button(
-                            onClick = { photoUri = "file://demo.jpg" }
-                        ) { Text("Simulate Photo") }
+                            onClick = { showPhotoCapture = true }
+                        ) { Text("Take Photo") }
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -136,10 +148,10 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
                         enabled = scannedQr != null,
                         onClick = {
                             vm.submitCheckIn(
-                                session = s,
+                                session   = s,
                                 scannedQr = scannedQr!!,
-                                location = lastLocation,
-                                photoUri = photoUri
+                                location  = lastLocation,
+                                photoUri  = photoUri
                             )
                         }
                     ) { Text("Check In") }
