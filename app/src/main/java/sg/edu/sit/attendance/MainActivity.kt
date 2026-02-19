@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sg.edu.sit.attendance.data.DbProvider
 import sg.edu.sit.attendance.data.SessionEntity
+import sg.edu.sit.attendance.qr.QrCamerascreen
 import com.google.android.gms.location.LocationServices
 
 class MainActivity : ComponentActivity() {
@@ -49,7 +50,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
     val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     // For base demo: ensure at least 1 session exists (insert once)
     LaunchedEffect(Unit) {
@@ -60,7 +60,7 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
             title = "Demo Session",
             startTimeMs = System.currentTimeMillis() - 60_000,
             endTimeMs = System.currentTimeMillis() + 60 * 60_000,
-            fenceLat = null, // set to real lat/lng to enforce fence
+            fenceLat = null,
             fenceLng = null,
             fenceRadiusM = null,
             qrCodePayload = "ATTEND:demo-session",
@@ -75,7 +75,10 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
     var lastLocation by remember { mutableStateOf<Location?>(null) }
     var photoUri by remember { mutableStateOf<String?>(null) }
 
-    // Grab last known location (simple base version)
+    // ── NEW: controls whether QR scanner screen is shown ──
+    var showQrScanner by remember { mutableStateOf(false) }
+
+    // Grab last known location
     LaunchedEffect(Unit) {
         val fused = LocationServices.getFusedLocationProviderClient(ctx)
         fused.lastLocation.addOnSuccessListener { loc ->
@@ -83,8 +86,26 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
         }
     }
 
+    // ── If QR scanner is open, show it full screen ──
+    if (showQrScanner) {
+        QrCamerascreen(
+            onQrScanned = { raw ->
+                scannedQr = raw         // save the scanned value
+                showQrScanner = false   // go back to main screen
+            },
+            onBack = {
+                showQrScanner = false   // user pressed back arrow
+            }
+        )
+        return // stop rendering the rest of this screen
+    }
+
+    // ── Main screen ──
     Column(Modifier.padding(16.dp)) {
-        Text("Attendance Base (QR + Location + Camera + Room + Sync)", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Attendance Base (QR + Location + Camera + Room + Sync)",
+            style = MaterialTheme.typography.titleMedium
+        )
         Spacer(Modifier.height(8.dp))
 
         Text("Sessions:")
@@ -96,21 +117,16 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
                     Spacer(Modifier.height(8.dp))
 
                     Row {
+                        // ── REPLACED: now opens real QR camera ──
                         Button(
-                            onClick = {
-                                // For base demo, we "simulate" scanning by setting it directly.
-                                // Your next step is to hook QrCameraPreview + analyzer (below).
-                                scannedQr = s.qrCodePayload
-                            }
-                        ) { Text("Simulate QR Scan") }
+                            onClick = { showQrScanner = true }
+                        ) { Text("Scan QR Code") }
 
                         Spacer(Modifier.width(8.dp))
 
+                        // Simulate photo still (will replace later)
                         Button(
-                            onClick = {
-                                // For base demo, we "simulate" a photo URI.
-                                photoUri = "file://demo.jpg"
-                            }
+                            onClick = { photoUri = "file://demo.jpg" }
                         ) { Text("Simulate Photo") }
                     }
 

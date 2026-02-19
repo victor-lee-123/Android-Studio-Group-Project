@@ -61,6 +61,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // CameraX
+    implementation("androidx.camera:camera-core:1.4.1")
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
@@ -72,4 +73,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
+
+    // ListenableFuture (Guava concurrent Lib)
+    implementation("com.google.guava:guava:32.1.3-android")
 }
