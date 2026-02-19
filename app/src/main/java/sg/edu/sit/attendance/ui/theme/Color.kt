@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.theme
+package sg.edu.sit.attendance.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "649681973325",
+    "project_id": "attendance-app-6940f",
+    "storage_bucket": "attendance-app-6940f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:649681973325:android:14bdb30fc286bcda86ac04",
+        "android_client_info": {
+          "package_name": "sg.edu.sit.attendance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCsAUNT7IBXQDKOaK95LOWmlPnCIQxt8s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
