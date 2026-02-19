@@ -25,15 +25,22 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,6 +51,9 @@ import sg.edu.sit.attendance.data.DbProvider
 import sg.edu.sit.attendance.data.SessionEntity
 import sg.edu.sit.attendance.qr.QrCamerascreen
 import sg.edu.sit.attendance.ui.CheckInResultDialog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ─────────────────────────────────────────────
 //  Light & Clean Professional Palette
@@ -63,6 +73,10 @@ private val DividerColor  = Color(0xFFE5EAF2)
 private val StepDoneBg    = Color(0xFFE8F5EE)
 private val StepPendBg    = Color(0xFFF0F3F9)
 private val DevPurple     = Color(0xFF7B1FA2)
+private val WarningOrange = Color(0xFFE65100)
+private val WarningBg     = Color(0xFFFFF3E0)
+private val ShimmerBase   = Color(0xFFE8ECF0)
+private val ShimmerHighlight = Color(0xFFF5F7FA)
 
 class MainActivity : ComponentActivity() {
 
@@ -89,10 +103,116 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ─────────────────────────────────────────────
+//  Shimmer effect modifier
+// ─────────────────────────────────────────────
+fun Modifier.shimmerEffect(): Modifier = composed {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+    background(
+        Brush.linearGradient(
+            colors = listOf(ShimmerBase, ShimmerHighlight, ShimmerBase),
+            start  = Offset(translateAnim - 200f, 0f),
+            end    = Offset(translateAnim, 0f)
+        )
+    )
+}
+
+// ─────────────────────────────────────────────
+//  Skeleton card shown while sessions load
+// ─────────────────────────────────────────────
+@Composable
+private fun SkeletonCard() {
+    Card(
+        modifier  = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
+        colors    = CardDefaults.cardColors(containerColor = BgCard),
+        shape     = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(20.dp)) {
+
+            // Title placeholder
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Box(Modifier.fillMaxWidth(0.6f).height(20.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.fillMaxWidth(0.35f).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                }
+                Box(Modifier.width(60.dp).height(26.dp).clip(RoundedCornerShape(20.dp)).shimmerEffect())
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Time box placeholder
+            Box(Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(10.dp)).shimmerEffect())
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = DividerColor)
+            Spacer(Modifier.height(16.dp))
+
+            // Step placeholders
+            repeat(3) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(30.dp).clip(RoundedCornerShape(15.dp)).shimmerEffect())
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Box(Modifier.width(120.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                        Spacer(Modifier.height(4.dp))
+                        Box(Modifier.width(80.dp).height(11.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    }
+                }
+                if (it < 2) Spacer(Modifier.height(12.dp))
+            }
+
+            Spacer(Modifier.height(22.dp))
+            HorizontalDivider(color = DividerColor)
+            Spacer(Modifier.height(16.dp))
+
+            // Button placeholders
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(10.dp)).shimmerEffect())
+                Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(10.dp)).shimmerEffect())
+            }
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+//  Time formatter helpers
+// ─────────────────────────────────────────────
+private fun formatTime(ms: Long): String =
+    SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(ms))
+
+private fun formatDate(ms: Long): String =
+    SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(ms))
+
+private fun timeRemaining(endMs: Long): String {
+    val diff = endMs - System.currentTimeMillis()
+    if (diff <= 0) return "Closed"
+    val mins = diff / 60000
+    return if (mins < 60) "${mins}m remaining" else "${mins / 60}h ${mins % 60}m remaining"
+}
+
 @SuppressLint("MissingPermission")
 @Composable
 private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
     val ctx = LocalContext.current
+
+    // Track if DB has been seeded and sessions have loaded
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         val dao = DbProvider.get(ctx).dao()
@@ -109,6 +229,8 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
             createdByUid  = "teacher",
         )
         dao.upsertSession(demo)
+        delay(800) // small delay so shimmer is visible
+        isLoading = false
     }
 
     val sessions         by vm.sessions.collectAsState()
@@ -191,43 +313,81 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
 
                     Spacer(Modifier.height(16.dp))
 
-                    sessions.forEach { s ->
-                        SessionCard(
-                            session      = s,
-                            scannedQr    = scannedQr,
-                            lastLocation = lastLocation,
-                            photoUri     = photoUri,
-                            onScanQr     = { showQrScanner = true },
-                            onTakePhoto  = { showPhotoCapture = true },
-                            onCheckIn    = {
-                                vm.submitCheckIn(
-                                    session   = s,
-                                    scannedQr = scannedQr!!,
-                                    location  = lastLocation,
-                                    photoUri  = photoUri
+                    // ── Skeleton / Empty / Sessions ───────
+                    when {
+                        isLoading -> {
+                            // Show 1 skeleton card while loading
+                            SkeletonCard()
+                        }
+                        sessions.isEmpty() -> {
+                            EmptyState()
+                        }
+                        else -> {
+                            sessions.forEach { s ->
+                                SessionCard(
+                                    session      = s,
+                                    scannedQr    = scannedQr,
+                                    lastLocation = lastLocation,
+                                    photoUri     = photoUri,
+                                    onScanQr     = { showQrScanner = true },
+                                    onTakePhoto  = { showPhotoCapture = true },
+                                    onCheckIn    = {
+                                        vm.submitCheckIn(
+                                            session   = s,
+                                            scannedQr = scannedQr!!,
+                                            location  = lastLocation,
+                                            photoUri  = photoUri
+                                        )
+                                        resultIsPresent  = vm.lastResult.startsWith("PRESENT")
+                                        resultText       = vm.lastResult
+                                        showResultDialog = true
+                                    },
+                                    onDevSimulate = {
+                                        vm.submitCheckIn(
+                                            session   = s,
+                                            scannedQr = s.qrCodePayload,
+                                            location  = lastLocation,
+                                            photoUri  = photoUri
+                                        )
+                                        resultIsPresent  = vm.lastResult.startsWith("PRESENT")
+                                        resultText       = vm.lastResult
+                                        showResultDialog = true
+                                    }
                                 )
-                                resultIsPresent  = vm.lastResult.startsWith("PRESENT")
-                                resultText       = vm.lastResult
-                                showResultDialog = true
-                            },
-                            // ── DEV ONLY: simulate check-in without QR ──
-                            onDevSimulate = {
-                                vm.submitCheckIn(
-                                    session   = s,
-                                    scannedQr = s.qrCodePayload,
-                                    location  = lastLocation,
-                                    photoUri  = photoUri
-                                )
-                                resultIsPresent  = vm.lastResult.startsWith("PRESENT")
-                                resultText       = vm.lastResult
-                                showResultDialog = true
                             }
-                        )
+                        }
                     }
 
                     Spacer(Modifier.height(32.dp))
                 }
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+//  Empty State
+// ─────────────────────────────────────────────
+@Composable
+private fun EmptyState() {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(visible = visible, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 2 }) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(Modifier.size(80.dp).background(BlueSoft, RoundedCornerShape(40.dp)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.DateRange, null, tint = BlueAccent, modifier = Modifier.size(36.dp))
+            }
+            Spacer(Modifier.height(20.dp))
+            Text("No Sessions Available", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "There are no active sessions right now.\nPlease check back later or contact your teacher.",
+                color = TextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 20.sp
+            )
         }
     }
 }
@@ -239,13 +399,10 @@ private fun BaseDemoScreen(vm: MainViewModel = viewModel()) {
 private fun AnimatedProgressChip(label: String, done: Boolean) {
     val animBg by animateColorAsState(
         targetValue   = if (done) SuccessGreen else Color.White.copy(alpha = 0.15f),
-        animationSpec = tween(400),
-        label         = "chipColor"
+        animationSpec = tween(400), label = "chipColor"
     )
-    val text = if (done) Color.White else Color.White.copy(alpha = 0.6f)
-    val icon = if (done) "✓ " else "○ "
     Box(Modifier.background(animBg, RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 5.dp)) {
-        Text("$icon$label", color = text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("${if (done) "✓ " else "○ "}$label", color = if (done) Color.White else Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -261,12 +418,14 @@ private fun SessionCard(
     onScanQr      : () -> Unit,
     onTakePhoto   : () -> Unit,
     onCheckIn     : () -> Unit,
-    onDevSimulate : () -> Unit          // ← DEV ONLY
+    onDevSimulate : () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
-    val allReady = scannedQr != null
+    val allReady  = scannedQr != null
+    val isClosed  = System.currentTimeMillis() > session.endTimeMs
+    val remaining = timeRemaining(session.endTimeMs)
 
     val glowAlpha by rememberInfiniteTransition(label = "glow").animateFloat(
         initialValue  = 0f,
@@ -277,46 +436,54 @@ private fun SessionCard(
 
     AnimatedVisibility(
         visible = visible,
-        enter   = fadeIn(tween(400)) + slideInVertically(
-            animationSpec  = tween(400, easing = FastOutSlowInEasing),
-            initialOffsetY = { it / 3 }
-        )
+        enter   = fadeIn(tween(400)) + slideInVertically(tween(400, easing = FastOutSlowInEasing)) { it / 3 }
     ) {
         Card(
-            modifier  = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-                .shadow(2.dp, RoundedCornerShape(16.dp)),
+            modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).shadow(2.dp, RoundedCornerShape(16.dp)),
             colors    = CardDefaults.cardColors(containerColor = BgCard),
             shape     = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(Modifier.padding(20.dp)) {
 
-                // Title row
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.Top
-                ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f)) {
                         Text(session.title, color = TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(3.dp))
                         Text("Group · ${session.groupId}", color = TextSecondary, fontSize = 12.sp)
                     }
                     Row(
-                        Modifier.background(BlueSoft, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
+                        Modifier.background(if (isClosed) WarningBg else BlueSoft, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        PulsingDot()
-                        Spacer(Modifier.width(5.dp))
-                        Text("Active", color = BlueAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        if (!isClosed) { PulsingDot(); Spacer(Modifier.width(5.dp)) }
+                        Text(if (isClosed) "Closed" else "Active", color = if (isClosed) WarningOrange else BlueAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(14.dp))
+
+                // Session time info box
+                Box(Modifier.fillMaxWidth().background(BgPage, RoundedCornerShape(10.dp)).padding(12.dp)) {
+                    Column {
+                        Text(formatDate(session.startTimeMs), color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(formatTime(session.startTimeMs), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text("  →  ", color = TextMuted, fontSize = 13.sp)
+                                Text(formatTime(session.endTimeMs), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Box(Modifier.background(if (isClosed) WarningBg else SuccessBg, RoundedCornerShape(20.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                                Text(remaining, color = if (isClosed) WarningOrange else SuccessGreen, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = DividerColor)
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Text("CHECK-IN STEPS", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
                 Spacer(Modifier.height(12.dp))
@@ -326,9 +493,12 @@ private fun SessionCard(
                 AnimatedStepRow(1, "2", "Take Photo",   photoUri != null,    if (photoUri != null) "Photo captured" else "Not taken yet")
                 Spacer(Modifier.height(10.dp))
                 AnimatedStepRow(2, "3", "Location",     lastLocation != null,
-                    if (lastLocation != null)
-                        "${lastLocation.latitude.toString().take(8)}, ${lastLocation.longitude.toString().take(8)}"
-                    else "Fetching location...")
+                    when {
+                        lastLocation == null     -> "Fetching location..."
+                        session.fenceLat == null -> "Location verified ✓"
+                        else                     -> "Within range ✓"
+                    }
+                )
 
                 Spacer(Modifier.height(22.dp))
                 HorizontalDivider(color = DividerColor)
@@ -344,34 +514,19 @@ private fun SessionCard(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Check In button with glow
-                Box(
-                    Modifier.fillMaxWidth().shadow(
-                        elevation    = if (allReady) (12 * glowAlpha + 2).dp else 0.dp,
-                        shape        = RoundedCornerShape(12.dp),
-                        ambientColor = BlueAccent.copy(alpha = glowAlpha),
-                        spotColor    = BlueAccent.copy(alpha = glowAlpha)
-                    )
-                ) {
+                Box(Modifier.fillMaxWidth().shadow(if (allReady) (12 * glowAlpha + 2).dp else 0.dp, RoundedCornerShape(12.dp), ambientColor = BlueAccent.copy(alpha = glowAlpha), spotColor = BlueAccent.copy(alpha = glowAlpha))) {
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
-                    val btnScale by animateFloatAsState(
-                        targetValue   = if (isPressed) 0.96f else 1f,
-                        animationSpec = spring(Spring.DampingRatioMediumBouncy),
-                        label         = "checkInScale"
-                    )
+                    val btnScale by animateFloatAsState(if (isPressed) 0.96f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "checkInScale")
                     Button(
                         onClick           = onCheckIn,
-                        enabled           = allReady,
+                        enabled           = allReady && !isClosed,
                         modifier          = Modifier.fillMaxWidth().height(52.dp).scale(btnScale),
                         interactionSource = interactionSource,
-                        colors            = ButtonDefaults.buttonColors(
-                            containerColor         = BlueAccent,
-                            disabledContainerColor = DividerColor
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                        colors            = ButtonDefaults.buttonColors(containerColor = BlueAccent, disabledContainerColor = DividerColor),
+                        shape             = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Check In", color = if (allReady) Color.White else TextMuted, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(if (isClosed) "Session Closed" else "Check In", color = if (allReady && !isClosed) Color.White else TextMuted, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
 
@@ -399,24 +554,18 @@ private fun AnimatedStepRow(index: Int, stepNumber: String, label: String, isDon
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(index * 120L); appeared = true }
 
-    val circleColor  by animateColorAsState(targetValue = if (isDone) SuccessGreen else TextMuted,     animationSpec = tween(500), label = "circleColor")
-    val circleBg     by animateColorAsState(targetValue = if (isDone) StepDoneBg else StepPendBg,      animationSpec = tween(500), label = "circleBg")
-    val circleBorder by animateColorAsState(targetValue = if (isDone) SuccessBorder else DividerColor, animationSpec = tween(500), label = "circleBorder")
+    val circleColor  by animateColorAsState(if (isDone) SuccessGreen else TextMuted,     tween(500), label = "circleColor")
+    val circleBg     by animateColorAsState(if (isDone) StepDoneBg else StepPendBg,      tween(500), label = "circleBg")
+    val circleBorder by animateColorAsState(if (isDone) SuccessBorder else DividerColor, tween(500), label = "circleBorder")
 
     var popped by remember { mutableStateOf(false) }
     LaunchedEffect(isDone) { if (isDone) { popped = false; delay(50); popped = true } }
-    val circleScale by animateFloatAsState(
-        targetValue   = if (popped) 1f else if (isDone) 1.15f else 1f,
-        animationSpec = spring(Spring.DampingRatioLowBouncy),
-        label         = "circleScale"
-    )
+    val circleScale by animateFloatAsState(if (popped) 1f else if (isDone) 1.15f else 1f, spring(Spring.DampingRatioLowBouncy), label = "circleScale")
 
     AnimatedVisibility(visible = appeared, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(30.dp).scale(circleScale)
-                    .background(circleBg, RoundedCornerShape(15.dp))
-                    .border(1.dp, circleBorder, RoundedCornerShape(15.dp)),
+                Modifier.size(30.dp).scale(circleScale).background(circleBg, RoundedCornerShape(15.dp)).border(1.dp, circleBorder, RoundedCornerShape(15.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(if (isDone) "✓" else stepNumber, color = circleColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -436,18 +585,16 @@ private fun AnimatedStepRow(index: Int, stepNumber: String, label: String, isDon
 @Composable
 private fun ScalePressButton(onClick: () -> Unit, modifier: Modifier, done: Boolean, label: String) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
+    val isPressed    by interactionSource.collectIsPressedAsState()
     val scale        by animateFloatAsState(if (isPressed) 0.94f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "btnScale")
     val borderColor  by animateColorAsState(if (done) SuccessBorder else DividerColor, tween(400), label = "borderColor")
     val contentColor by animateColorAsState(if (done) SuccessGreen else BlueAccent,    tween(400), label = "contentColor")
 
     OutlinedButton(
-        onClick           = onClick,
-        modifier          = modifier.scale(scale),
-        interactionSource = interactionSource,
-        colors            = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
-        border            = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-        shape             = RoundedCornerShape(10.dp)
+        onClick = onClick, modifier = modifier.scale(scale), interactionSource = interactionSource,
+        colors  = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
+        border  = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        shape   = RoundedCornerShape(10.dp)
     ) {
         Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
