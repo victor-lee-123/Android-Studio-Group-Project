@@ -6,6 +6,8 @@ import android.location.Location
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -30,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -52,31 +55,135 @@ import java.util.Date
 import java.util.Locale
 
 // ─────────────────────────────────────────────────────────────
-//  DigiPen Colour Palette
+//  Theme System
 // ─────────────────────────────────────────────────────────────
-val BgPage        = Color(0xFF0D0D0D)
-val BgCard        = Color(0xFF1C1C1C)
-val BgSurface2    = Color(0xFF242424)
-val BgSurface3    = Color(0xFF2E2E2E)
-val DigiRed       = Color(0xFFC8102E)
-val DigiRedDark   = Color(0xFF9B0B22)
-val DigiRedSoft   = Color(0x1AC8102E)
-val DigiRedBorder = Color(0x40C8102E)
-val SuccessGreen  = Color(0xFF22C55E)
-val SuccessSoft   = Color(0x1A22C55E)
-val SuccessBorder = Color(0x4022C55E)
-val WarningAmber  = Color(0xFFF59E0B)
-val WarningBg     = Color(0x1AF59E0B)
-val WarningBorder = Color(0x40F59E0B)
-val InfoBlue      = Color(0xFF3B82F6)
-val InfoBlueSoft  = Color(0x1A3B82F6)
-val InfoBlueBorder= Color(0x403B82F6)
-val TextPrimary   = Color(0xFFF0F0F0)
-val TextSecondary = Color(0xFF888888)
-val TextMuted     = Color(0xFF555555)
-val DividerColor  = Color(0xFF2A2A2A)
-val ShimmerBase   = Color(0xFF1C1C1C)
-val ShimmerHigh   = Color(0xFF2E2E2E)
+enum class ThemeMode { DARK, LIGHT, SYSTEM }
+
+data class AppColors(
+    val bgPage: Color,
+    val bgCard: Color,
+    val bgSurface2: Color,
+    val bgSurface3: Color,
+    val digiRed: Color,
+    val digiRedDark: Color,
+    val digiRedSoft: Color,
+    val digiRedBorder: Color,
+    val successGreen: Color,
+    val successSoft: Color,
+    val successBorder: Color,
+    val warningAmber: Color,
+    val warningBg: Color,
+    val warningBorder: Color,
+    val infoBlue: Color,
+    val infoBlueSoft: Color,
+    val infoBlueBorder: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textMuted: Color,
+    val dividerColor: Color,
+    val shimmerBase: Color,
+    val shimmerHigh: Color,
+    val headerGradientTop: Color,
+    val navBarColor: Color,
+    val navBarBorder: Color,
+    val isDark: Boolean
+)
+
+val DarkColors = AppColors(
+    bgPage          = Color(0xFF0D0D0D),
+    bgCard          = Color(0xFF1C1C1C),
+    bgSurface2      = Color(0xFF242424),
+    bgSurface3      = Color(0xFF2E2E2E),
+    digiRed         = Color(0xFFC8102E),
+    digiRedDark     = Color(0xFF9B0B22),
+    digiRedSoft     = Color(0x1AC8102E),
+    digiRedBorder   = Color(0x40C8102E),
+    successGreen    = Color(0xFF22C55E),
+    successSoft     = Color(0x1A22C55E),
+    successBorder   = Color(0x4022C55E),
+    warningAmber    = Color(0xFFF59E0B),
+    warningBg       = Color(0x1AF59E0B),
+    warningBorder   = Color(0x40F59E0B),
+    infoBlue        = Color(0xFF3B82F6),
+    infoBlueSoft    = Color(0x1A3B82F6),
+    infoBlueBorder  = Color(0x403B82F6),
+    textPrimary     = Color(0xFFF0F0F0),
+    textSecondary   = Color(0xFF888888),
+    textMuted       = Color(0xFF555555),
+    dividerColor    = Color(0xFF2A2A2A),
+    shimmerBase     = Color(0xFF1C1C1C),
+    shimmerHigh     = Color(0xFF2E2E2E),
+    headerGradientTop = Color(0xFF1A0005),
+    navBarColor     = Color(0xFF1C1C1C),
+    navBarBorder    = Color(0xFF2A2A2A),
+    isDark          = true
+)
+
+val LightColors = AppColors(
+    // Page & card backgrounds — clean white/light grey
+    bgPage          = Color(0xFFF0F0F2),
+    bgCard          = Color(0xFFFFFFFF),
+    bgSurface2      = Color(0xFFEAEAEC),
+    bgSurface3      = Color(0xFFE0E0E3),
+    // Red accent — same as dark mode for brand consistency
+    digiRed         = Color(0xFFC8102E),
+    digiRedDark     = Color(0xFF9B0B22),
+    digiRedSoft     = Color(0x1AC8102E),
+    digiRedBorder   = Color(0x40C8102E),
+    // Status colours — slightly adjusted for light backgrounds
+    successGreen    = Color(0xFF16A34A),
+    successSoft     = Color(0x1A16A34A),
+    successBorder   = Color(0x4016A34A),
+    warningAmber    = Color(0xFFD97706),
+    warningBg       = Color(0x1AD97706),
+    warningBorder   = Color(0x40D97706),
+    infoBlue        = Color(0xFF2563EB),
+    infoBlueSoft    = Color(0x1A2563EB),
+    infoBlueBorder  = Color(0x402563EB),
+    // Text — dark on light backgrounds
+    textPrimary     = Color(0xFF111827),
+    textSecondary   = Color(0xFF6B7280),
+    textMuted       = Color(0xFF9CA3AF),
+    dividerColor    = Color(0xFFE2E2E5),
+    shimmerBase     = Color(0xFFE5E5E8),
+    shimmerHigh     = Color(0xFFF0F0F3),
+    // Navy blue header — institutional/professional feel
+    headerGradientTop = Color(0xFF0B1D3A),
+    navBarColor     = Color(0xFF0B1D3A),
+    navBarBorder    = Color(0xFF1A3055),
+    isDark          = false
+)
+
+val LocalColors = compositionLocalOf { DarkColors }
+
+// Convenience accessor — use C.xxx anywhere inside a Composable
+val C @Composable get() = LocalColors.current
+
+// Keep legacy top-level vals pointing at dark values so non-composable helpers
+// (leaveStatusColors, sessionStatus, etc.) continue to compile unchanged.
+val BgPage        = DarkColors.bgPage
+val BgCard        = DarkColors.bgCard
+val BgSurface2    = DarkColors.bgSurface2
+val BgSurface3    = DarkColors.bgSurface3
+val DigiRed       = DarkColors.digiRed
+val DigiRedDark   = DarkColors.digiRedDark
+val DigiRedSoft   = DarkColors.digiRedSoft
+val DigiRedBorder = DarkColors.digiRedBorder
+val SuccessGreen  = DarkColors.successGreen
+val SuccessSoft   = DarkColors.successSoft
+val SuccessBorder = DarkColors.successBorder
+val WarningAmber  = DarkColors.warningAmber
+val WarningBg     = DarkColors.warningBg
+val WarningBorder = DarkColors.warningBorder
+val InfoBlue      = DarkColors.infoBlue
+val InfoBlueSoft  = DarkColors.infoBlueSoft
+val InfoBlueBorder= DarkColors.infoBlueBorder
+val TextPrimary   = DarkColors.textPrimary
+val TextSecondary = DarkColors.textSecondary
+val TextMuted     = DarkColors.textMuted
+val DividerColor  = DarkColors.dividerColor
+val ShimmerBase   = DarkColors.shimmerBase
+val ShimmerHigh   = DarkColors.shimmerHigh
 
 // ─────────────────────────────────────────────────────────────
 //  Navigation
@@ -113,11 +220,7 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_COARSE_LOCATION
         ))
         setContent {
-            MaterialTheme {
-                Surface(Modifier.fillMaxSize(), color = BgPage) {
-                    DigiCheckApp()
-                }
-            }
+            DigiCheckApp()
         }
     }
 }
@@ -133,6 +236,37 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
     val sessions      by vm.sessions.collectAsState()
     val leaveList     by vm.leaveRequests.collectAsState()
     val checkInResult by vm.lastCheckInResult.collectAsState()
+
+    // ── Theme ────────────────────────────────────────────────
+    val prefs = remember { ctx.getSharedPreferences("digi_prefs", android.content.Context.MODE_PRIVATE) }
+    var themeMode by remember {
+        mutableStateOf(
+            when (prefs.getString("theme_mode", "DARK")) {
+                "LIGHT"  -> ThemeMode.LIGHT
+                "SYSTEM" -> ThemeMode.SYSTEM
+                else     -> ThemeMode.DARK
+            }
+        )
+    }
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val appColors = when (themeMode) {
+        ThemeMode.DARK   -> DarkColors
+        ThemeMode.LIGHT  -> LightColors
+        ThemeMode.SYSTEM -> if (systemDark) DarkColors else LightColors
+    }
+    // Status bar icon colour — dark icons on light backgrounds, light icons on dark
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        val window = (view.context as android.app.Activity).window
+        SideEffect {
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !appColors.isDark
+        }
+    }
+    fun saveTheme(mode: ThemeMode) {
+        themeMode = mode
+        prefs.edit().putString("theme_mode", mode.name).apply()
+    }
 
     // Seed demo sessions once
     var seeded by remember { mutableStateOf(false) }
@@ -198,106 +332,115 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
     fun resetCheckIn() { scannedQr = null; enteredPin = null; photoUri = null; vm.clearCheckInResult() }
     fun goTo(s: Screen) { currentScreen = s }
 
-    AnimatedContent(
-        targetState  = currentScreen,
-        transitionSpec = {
-            val fwd = slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(280)) togetherWith
-                    slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(200))
-            val bck = slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(280)) togetherWith
-                    slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
-            when (targetState) {
-                Screen.Login, Screen.Dashboard, Screen.LeaveList -> bck
-                else -> fwd
-            }
-        },
-        label = "nav"
-    ) { screen ->
-        when (screen) {
-            Screen.Login -> LoginScreen { id, pwd, role ->
-                vm.login(id, pwd, role) { ok, _ ->
-                    if (ok) {
-                        if (role.uppercase() == "PROFESSOR") goTo(Screen.ProfDashboard)
-                        else goTo(Screen.Dashboard)
+    CompositionLocalProvider(LocalColors provides appColors) {
+        MaterialTheme {
+            Surface(Modifier.fillMaxSize(), color = appColors.bgPage) {
+                AnimatedContent(
+                    targetState  = currentScreen,
+                    transitionSpec = {
+                        val fwd = slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(280)) togetherWith
+                                slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(200))
+                        val bck = slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(280)) togetherWith
+                                slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
+                        when (targetState) {
+                            Screen.Login, Screen.Dashboard, Screen.LeaveList -> bck
+                            else -> fwd
+                        }
+                    },
+                    label = "nav"
+                ) { screen ->
+                    when (screen) {
+                        Screen.Login -> LoginScreen { id, pwd, role ->
+                            vm.login(id, pwd, role) { ok, _ ->
+                                if (ok) {
+                                    if (role.uppercase() == "PROFESSOR") goTo(Screen.ProfDashboard)
+                                    else goTo(Screen.Dashboard)
+                                }
+                            }
+                        }
+                        Screen.Dashboard -> DashboardScreen(
+                            vm           = vm,
+                            sessions     = sessions,
+                            leaveList    = leaveList,
+                            onCheckIn    = { s -> selectedSession = s; resetCheckIn(); goTo(Screen.CheckIn) },
+                            onNewLeave   = { goTo(Screen.LeaveForm) },
+                            onViewLeave  = { goTo(Screen.LeaveList) },
+                            onLogout     = { vm.logout(); goTo(Screen.Login) },
+                            themeMode    = themeMode,
+                            onThemeChange = ::saveTheme
+                        )
+                        Screen.CheckIn -> LocationCheckScreen(
+                            session       = selectedSession!!,
+                            lastLocation  = effectiveLocation,
+                            spoofLocation = spoofLocation,
+                            onToggleSpoof = { spoofLocation = !spoofLocation },
+                            onProceed     = { goTo(Screen.QrScan) },
+                            onBack        = { goTo(Screen.Dashboard) }
+                        )
+                        Screen.QrScan -> QrPinScreen(
+                            session    = selectedSession!!,
+                            onVerified = { qr, pin -> scannedQr = qr; enteredPin = pin; goTo(Screen.Photo) },
+                            onBack     = { goTo(Screen.CheckIn) }
+                        )
+                        Screen.Photo -> PhotoCaptureScreen(
+                            onPhotoCaptured = { uri ->
+                                photoUri = uri
+                                selectedSession?.let { s ->
+                                    vm.submitCheckIn(s, scannedQr, enteredPin, effectiveLocation, uri)
+                                }
+                                goTo(Screen.Success)
+                            },
+                            onBack = { goTo(Screen.QrScan) }
+                        )
+                        Screen.Success -> CheckInSuccessScreen(
+                            session       = selectedSession!!,
+                            checkInResult = checkInResult,
+                            photoUri      = photoUri,
+                            onDone        = { resetCheckIn(); goTo(Screen.Dashboard) }
+                        )
+                        Screen.LeaveForm -> LeaveFormScreen(
+                            vm          = vm,
+                            sessions    = sessions,
+                            onBack      = { goTo(Screen.Dashboard) },
+                            onSubmitted = { goTo(Screen.LeaveList) }
+                        )
+                        Screen.LeaveList -> LeaveListScreen(
+                            leaveList  = leaveList,
+                            onBack     = { goTo(Screen.Dashboard) },
+                            onNewLeave = { goTo(Screen.LeaveForm) }
+                        )
+                        // ── Professor screens ─────────────────────────────────
+                        Screen.ProfDashboard -> ProfDashboardScreen(
+                            vm        = vm,
+                            sessions  = sessions,
+                            onOpenClass = { s -> selectedSession = s; goTo(Screen.ClassAccess) },
+                            onViewAttendance = { s -> selectedSession = s; goTo(Screen.AttendanceList) },
+                            onLogout  = { vm.logout(); goTo(Screen.Login) },
+                            themeMode    = themeMode,
+                            onThemeChange = ::saveTheme
+                        )
+                        Screen.ClassAccess -> ClassAccessScreen(
+                            session = selectedSession!!,
+                            onViewAttendance = { goTo(Screen.AttendanceList) },
+                            onBack  = { goTo(Screen.ProfDashboard) }
+                        )
+                        Screen.AttendanceList -> AttendanceListScreen(
+                            session = selectedSession!!,
+                            onBack  = { goTo(Screen.ClassAccess) }
+                        )
                     }
                 }
-            }
-            Screen.Dashboard -> DashboardScreen(
-                vm           = vm,
-                sessions     = sessions,
-                leaveList    = leaveList,
-                onCheckIn    = { s -> selectedSession = s; resetCheckIn(); goTo(Screen.CheckIn) },
-                onNewLeave   = { goTo(Screen.LeaveForm) },
-                onViewLeave  = { goTo(Screen.LeaveList) },
-                onLogout     = { vm.logout(); goTo(Screen.Login) }
-            )
-            Screen.CheckIn -> LocationCheckScreen(
-                session       = selectedSession!!,
-                lastLocation  = effectiveLocation,
-                spoofLocation = spoofLocation,
-                onToggleSpoof = { spoofLocation = !spoofLocation },
-                onProceed     = { goTo(Screen.QrScan) },
-                onBack        = { goTo(Screen.Dashboard) }
-            )
-            Screen.QrScan -> QrPinScreen(
-                session    = selectedSession!!,
-                onVerified = { qr, pin -> scannedQr = qr; enteredPin = pin; goTo(Screen.Photo) },
-                onBack     = { goTo(Screen.CheckIn) }
-            )
-            Screen.Photo -> PhotoCaptureScreen(
-                onPhotoCaptured = { uri ->
-                    photoUri = uri
-                    selectedSession?.let { s ->
-                        vm.submitCheckIn(s, scannedQr, enteredPin, effectiveLocation, uri)
-                    }
-                    goTo(Screen.Success)
-                },
-                onBack = { goTo(Screen.QrScan) }
-            )
-            Screen.Success -> CheckInSuccessScreen(
-                session       = selectedSession!!,
-                checkInResult = checkInResult,
-                photoUri      = photoUri,
-                onDone        = { resetCheckIn(); goTo(Screen.Dashboard) }
-            )
-            Screen.LeaveForm -> LeaveFormScreen(
-                vm          = vm,
-                sessions    = sessions,
-                onBack      = { goTo(Screen.Dashboard) },
-                onSubmitted = { goTo(Screen.LeaveList) }
-            )
-            Screen.LeaveList -> LeaveListScreen(
-                leaveList  = leaveList,
-                onBack     = { goTo(Screen.Dashboard) },
-                onNewLeave = { goTo(Screen.LeaveForm) }
-            )
-            // ── Professor screens ─────────────────────────────────
-            Screen.ProfDashboard -> ProfDashboardScreen(
-                vm        = vm,
-                sessions  = sessions,
-                onOpenClass = { s -> selectedSession = s; goTo(Screen.ClassAccess) },
-                onViewAttendance = { s -> selectedSession = s; goTo(Screen.AttendanceList) },
-                onLogout  = { vm.logout(); goTo(Screen.Login) }
-            )
-            Screen.ClassAccess -> ClassAccessScreen(
-                session = selectedSession!!,
-                onViewAttendance = { goTo(Screen.AttendanceList) },
-                onBack  = { goTo(Screen.ProfDashboard) }
-            )
-            Screen.AttendanceList -> AttendanceListScreen(
-                session = selectedSession!!,
-                onBack  = { goTo(Screen.ClassAccess) }
-            )
-        }
-    }
+            } } } // Surface / MaterialTheme / CompositionLocalProvider
 }
 
 // ─────────────────────────────────────────────────────────────
 //  Helpers & common components
 // ─────────────────────────────────────────────────────────────
 fun Modifier.shimmerEffect(): Modifier = composed {
+    val colors = LocalColors.current
     val t = rememberInfiniteTransition(label = "sh")
     val x by t.animateFloat(0f, 800f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "shx")
-    background(Brush.linearGradient(listOf(ShimmerBase, ShimmerHigh, ShimmerBase), Offset(x - 200f, 0f), Offset(x, 0f)))
+    background(Brush.linearGradient(listOf(colors.shimmerBase, colors.shimmerHigh, colors.shimmerBase), Offset(x - 200f, 0f), Offset(x, 0f)))
 }
 
 fun fmtTime(ms: Long): String     = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(ms))
@@ -319,10 +462,11 @@ fun PulsingDot(color: Color = DigiRed, size: Int = 6) {
 
 @Composable
 fun DigiTopBar(title: String, onBack: () -> Unit, trailing: @Composable () -> Unit = {}) {
+    val C = LocalColors.current
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextPrimary) }
-        Text(title, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = C.textPrimary) }
+        Text(title, color = C.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         trailing()
     }
 }
@@ -330,28 +474,30 @@ fun DigiTopBar(title: String, onBack: () -> Unit, trailing: @Composable () -> Un
 @Composable
 fun DigiButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
                enabled: Boolean = true, outlined: Boolean = false) {
+    val C = LocalColors.current
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.96f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "bs")
     if (outlined) {
         OutlinedButton(onClick = onClick, modifier = modifier.scale(scale).height(50.dp),
             enabled = enabled, interactionSource = src,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = DigiRed),
-            border = BorderStroke(1.dp, if (enabled) DigiRed else TextMuted),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = C.digiRed),
+            border = BorderStroke(1.dp, if (enabled) C.digiRed else C.textMuted),
             shape  = RoundedCornerShape(12.dp)
         ) { Text(text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp) }
     } else {
         Button(onClick = onClick, modifier = modifier.scale(scale).height(50.dp),
             enabled = enabled, interactionSource = src,
-            colors = ButtonDefaults.buttonColors(containerColor = DigiRed, disabledContainerColor = BgSurface3),
+            colors = ButtonDefaults.buttonColors(containerColor = C.digiRed, disabledContainerColor = C.bgSurface3),
             shape  = RoundedCornerShape(12.dp)
-        ) { Text(text, color = if (enabled) Color.White else TextMuted, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 0.5.sp) }
+        ) { Text(text, color = if (enabled) Color.White else C.textMuted, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 0.5.sp) }
     }
 }
 
 @Composable
 fun FieldLabel(text: String) {
-    Text(text, color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+    val C = LocalColors.current
+    Text(text, color = C.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
         letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 6.dp))
 }
 
@@ -361,13 +507,14 @@ fun DigiTextField(value: String, onValueChange: (String) -> Unit, placeholder: S
                   singleLine: Boolean = true, minLines: Int = 1, modifier: Modifier = Modifier.fillMaxWidth(),
                   leadingIcon: @Composable (() -> Unit)? = null) {
     var show by remember { mutableStateOf(false) }
+    val C = LocalColors.current
     OutlinedTextField(value = value, onValueChange = onValueChange, modifier = modifier, singleLine = singleLine,
         minLines = minLines,
-        placeholder = { Text(placeholder, color = TextMuted, fontSize = 14.sp) },
+        placeholder = { Text(placeholder, color = C.textMuted, fontSize = 14.sp) },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = DigiRed, unfocusedBorderColor = DividerColor,
-            focusedContainerColor = BgSurface2, unfocusedContainerColor = BgSurface2,
-            cursorColor = DigiRed, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+            focusedBorderColor = C.digiRed, unfocusedBorderColor = C.dividerColor,
+            focusedContainerColor = C.bgSurface2, unfocusedContainerColor = C.bgSurface2,
+            cursorColor = C.digiRed, focusedTextColor = C.textPrimary, unfocusedTextColor = C.textPrimary
         ),
         shape = RoundedCornerShape(12.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
@@ -375,7 +522,7 @@ fun DigiTextField(value: String, onValueChange: (String) -> Unit, placeholder: S
         leadingIcon = leadingIcon,
         trailingIcon = if (isPassword) ({
             TextButton(onClick = { show = !show }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text(if (show) "Hide" else "Show", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (show) "Hide" else "Show", color = C.textMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }) else null
     )
@@ -391,8 +538,9 @@ fun LoginScreen(onLogin: (String, String, String) -> Unit) {
     var role      by remember { mutableStateOf("Student") }
     var errorMsg  by remember { mutableStateOf("") }
 
+    val C = LocalColors.current
     Box(Modifier.fillMaxSize()
-        .background(Brush.verticalGradient(listOf(Color(0xFF1A0005), BgPage, BgPage)))) {
+        .background(Brush.verticalGradient(listOf(C.headerGradientTop, C.headerGradientTop, C.bgPage)))) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .statusBarsPadding().navigationBarsPadding().padding(horizontal = 28.dp)) {
 
@@ -404,21 +552,21 @@ fun LoginScreen(onLogin: (String, String, String) -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 Text("DIGI", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
                 Text("PEN", color = DigiRed,    fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-                Text(" SG",  color = TextSecondary, fontSize = 13.sp, letterSpacing = 3.sp)
+                Text(" SG",  color = Color.White.copy(0.6f), fontSize = 13.sp, letterSpacing = 3.sp)
             }
             Spacer(Modifier.height(24.dp))
             Text("Welcome\nBack.", color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Bold, lineHeight = 44.sp)
-            Text("Sign in to your account", color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+            Text("Sign in to your account", color = Color.White.copy(0.7f), fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
 
             Spacer(Modifier.height(36.dp))
 
             // Role toggle
-            Row(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(12.dp))
-                .border(1.dp, DividerColor, RoundedCornerShape(12.dp)).padding(4.dp)) {
+            Row(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(12.dp))
+                .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp)).padding(4.dp)) {
                 listOf("Student", "Professor").forEach { r ->
-                    Box(Modifier.weight(1f).background(if (role == r) DigiRed else Color.Transparent, RoundedCornerShape(10.dp))
+                    Box(Modifier.weight(1f).background(if (role == r) C.digiRed else Color.Transparent, RoundedCornerShape(10.dp))
                         .clickable { role = r }.padding(vertical = 11.dp), contentAlignment = Alignment.Center) {
-                        Text(r, color = if (role == r) Color.White else TextSecondary,
+                        Text(r, color = if (role == r) Color.White else C.textSecondary,
                             fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     }
                 }
@@ -452,16 +600,17 @@ fun LoginScreen(onLogin: (String, String, String) -> Unit) {
 
             Spacer(Modifier.height(16.dp))
             Text("Forgot Password?", color = DigiRed, fontSize = 13.sp,
+                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
                 modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             Spacer(Modifier.height(16.dp))
             // DEV HINT
-            Box(Modifier.fillMaxWidth().background(BgSurface2, RoundedCornerShape(10.dp))
-                .border(1.dp, DividerColor, RoundedCornerShape(10.dp)).padding(12.dp)) {
+            Box(Modifier.fillMaxWidth().background(C.bgSurface2, RoundedCornerShape(10.dp))
+                .border(1.dp, C.dividerColor, RoundedCornerShape(10.dp)).padding(12.dp)) {
                 Column {
-                    Text("🧪  Test accounts", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    Text("🧪  Test accounts", color = C.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("Student:   alex.t  /  password123", color = TextSecondary, fontSize = 11.sp)
-                    Text("Professor: rajan.a  /  password123", color = TextSecondary, fontSize = 11.sp)
+                    Text("Student:   alex.t  /  password123", color = C.textSecondary, fontSize = 11.sp)
+                    Text("Professor: rajan.a  /  password123", color = C.textSecondary, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(40.dp))
@@ -480,18 +629,22 @@ fun DashboardScreen(
     onCheckIn: (SessionEntity) -> Unit,
     onNewLeave: () -> Unit,
     onViewLeave: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.DARK,
+    onThemeChange: (ThemeMode) -> Unit = {}
 ) {
+    val C = LocalColors.current
     val userName  by vm.currentUserName.collectAsState()
     val studentId by vm.currentStudentId.collectAsState()
+    val role      by vm.currentRole.collectAsState()
     val initials  = userName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("")
     val now       = System.currentTimeMillis()
     var tab by remember { mutableStateOf(0) }
 
-    Scaffold(containerColor = BgPage,
+    Scaffold(containerColor = C.bgPage,
         bottomBar = {
-            NavigationBar(containerColor = BgCard, tonalElevation = 0.dp,
-                modifier = Modifier.border(BorderStroke(1.dp, DividerColor), RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))) {
+            NavigationBar(containerColor = C.navBarColor, tonalElevation = 0.dp,
+                modifier = Modifier.border(BorderStroke(1.dp, C.navBarBorder), RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))) {
                 listOf(Triple(0, Icons.Default.Home, "Home"),
                     Triple(1, Icons.Default.DateRange, "Classes"),
                     Triple(2, Icons.Default.List, "Leave"),
@@ -499,9 +652,9 @@ fun DashboardScreen(
                     NavigationBarItem(selected = tab == idx, onClick = { tab = idx },
                         icon = { Icon(icon, null) }, label = { Text(label, fontSize = 10.sp) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = DigiRed, selectedTextColor = DigiRed,
-                            unselectedIconColor = TextMuted, unselectedTextColor = TextMuted,
-                            indicatorColor = DigiRedSoft))
+                            selectedIconColor = C.digiRed, selectedTextColor = C.digiRed,
+                            unselectedIconColor = Color.White.copy(0.45f), unselectedTextColor = Color.White.copy(0.45f),
+                            indicatorColor = C.digiRedSoft))
                 }
             }
         }
@@ -509,24 +662,25 @@ fun DashboardScreen(
         // Shared header
         Column(Modifier.fillMaxSize().padding(pad)) {
             Box(Modifier.fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color(0xFF1A0005), BgPage)))
+                .background(Brush.verticalGradient(listOf(C.headerGradientTop, C.bgPage)))
                 .statusBarsPadding().padding(horizontal = 20.dp, vertical = 20.dp)) {
+                // Header is always on dark bg — use fixed white text regardless of theme
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                     Column {
-                        Text("Good ${greeting()},", color = TextSecondary, fontSize = 13.sp)
-                        Text(userName, color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("Good ${greeting()},", color = Color.White.copy(0.6f), fontSize = 13.sp)
+                        Text(userName, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp))
                             .border(1.dp, DigiRedBorder, RoundedCornerShape(20.dp))
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(6.dp).background(DigiRed, CircleShape))
+                            Box(Modifier.size(6.dp).background(C.digiRed, CircleShape))
                             Spacer(Modifier.width(6.dp))
-                            Text(studentId, color = DigiRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+                            Text(studentId, color = C.digiRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
                         }
                     }
                     Box(Modifier.size(42.dp)
-                        .background(Brush.radialGradient(listOf(DigiRedDark, DigiRed)), CircleShape)
+                        .background(Brush.radialGradient(listOf(C.digiRedDark, C.digiRed)), CircleShape)
                         .clickable { onLogout() }, contentAlignment = Alignment.Center) {
                         Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
@@ -538,7 +692,7 @@ fun DashboardScreen(
                 // ── HOME: today's classes (compact) + leave summary ──────────────
                 0 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                     Text("📅  Today — ${fmtDate(now)}",
-                        color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
+                        color = C.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
                         modifier = Modifier.padding(bottom = 10.dp))
                     sessions.forEach { s ->
                         val status = sessionStatus(s)
@@ -547,16 +701,16 @@ fun DashboardScreen(
                     }
                     Spacer(Modifier.height(20.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Leave Requests", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        Text("+ New", color = DigiRed, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        Text("Leave Requests", color = C.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("+ New", color = C.digiRed, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable { onNewLeave() })
                     }
                     Spacer(Modifier.height(10.dp))
                     if (leaveList.isEmpty()) {
-                        Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(14.dp))
-                            .border(1.dp, DividerColor, RoundedCornerShape(14.dp)).padding(20.dp),
+                        Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(14.dp))
+                            .border(1.dp, C.dividerColor, RoundedCornerShape(14.dp)).padding(20.dp),
                             contentAlignment = Alignment.Center) {
-                            Text("No leave requests yet", color = TextMuted, fontSize = 13.sp)
+                            Text("No leave requests yet", color = C.textMuted, fontSize = 13.sp)
                         }
                     } else {
                         leaveList.take(2).forEach { LeaveCardCompact(it); Spacer(Modifier.height(8.dp)) }
@@ -569,7 +723,7 @@ fun DashboardScreen(
 
                 // ── CLASSES: full schedule list ───────────────────────────────────
                 1 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-                    Text("YOUR SCHEDULE", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    Text("YOUR SCHEDULE", color = C.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp, modifier = Modifier.padding(bottom = 12.dp))
                     sessions.forEach { s ->
                         val status = sessionStatus(s)
@@ -588,19 +742,19 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("MY LEAVE REQUESTS", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                        Box(Modifier.background(DigiRed, RoundedCornerShape(8.dp)).clickable { onNewLeave() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Text("MY LEAVE REQUESTS", color = C.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                        Box(Modifier.background(C.digiRed, RoundedCornerShape(8.dp)).clickable { onNewLeave() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
                             Text("+ New", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     if (leaveList.isEmpty()) {
-                        Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(14.dp))
-                            .border(1.dp, DividerColor, RoundedCornerShape(14.dp)).padding(32.dp),
+                        Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(14.dp))
+                            .border(1.dp, C.dividerColor, RoundedCornerShape(14.dp)).padding(32.dp),
                             contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("📄", fontSize = 36.sp)
                                 Spacer(Modifier.height(8.dp))
-                                Text("No leave requests yet", color = TextMuted, fontSize = 13.sp)
+                                Text("No leave requests yet", color = C.textMuted, fontSize = 13.sp)
                             }
                         }
                     } else {
@@ -610,19 +764,15 @@ fun DashboardScreen(
                 }
 
                 // ── PROFILE ───────────────────────────────────────────────────────
-                else -> Column(Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Box(Modifier.size(72.dp).background(Brush.radialGradient(listOf(DigiRedDark, DigiRed)), CircleShape),
-                        contentAlignment = Alignment.Center) {
-                        Text(initials, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text(userName, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text(studentId, color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
-                    Text("Student", color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-                    Spacer(Modifier.height(32.dp))
-                    DigiButton("Sign Out", onClick = onLogout, modifier = Modifier.fillMaxWidth(0.6f), outlined = true)
-                }
+                else -> ProfileTab(
+                    userName    = userName,
+                    userId      = studentId,
+                    role        = role,
+                    initials    = initials,
+                    themeMode   = themeMode,
+                    onThemeChange = onThemeChange,
+                    onLogout    = onLogout
+                )
             }
         }
     }
@@ -631,16 +781,17 @@ fun DashboardScreen(
 @Composable
 fun ClassRow(session: SessionEntity, isLive: Boolean, isDone: Boolean, onCheckIn: () -> Unit) {
     val a by animateFloatAsState(if (isDone) 0.4f else if (!isLive) 0.6f else 1f, tween(300), label = "ra")
+    val C = LocalColors.current
     Box(Modifier.fillMaxWidth().alpha(a)
-        .background(if (isLive) BgSurface3 else BgCard, RoundedCornerShape(12.dp))
-        .border(1.dp, if (isLive) Color.White.copy(0.14f) else DividerColor, RoundedCornerShape(12.dp))
+        .background(if (isLive) C.digiRedSoft else C.bgCard, RoundedCornerShape(12.dp))
+        .border(1.dp, if (isLive) C.digiRedBorder else C.dividerColor, RoundedCornerShape(12.dp))
         .clickable(enabled = isLive) { onCheckIn() }) {
 
         if (isLive) {
             val sa by rememberInfiniteTransition(label = "s").animateFloat(0.5f, 1f,
                 infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "sv")
             Box(Modifier.width(3.dp).fillMaxHeight()
-                .background(DigiRed.copy(sa), RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                .background(C.digiRed.copy(sa), RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
                 .align(Alignment.CenterStart))
         }
 
@@ -648,23 +799,23 @@ fun ClassRow(session: SessionEntity, isLive: Boolean, isDone: Boolean, onCheckIn
             verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(start = if (isLive) 8.dp else 0.dp)) {
                 Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}",
-                    color = if (isLive) TextPrimary else TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    color = if (isLive) C.digiRed else C.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(2.dp))
-                Text(session.courseCode, color = if (isLive) Color.White else TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Text(session.title, color = TextSecondary, fontSize = 12.sp)
-                if (session.room.isNotBlank()) Text(session.room, color = TextMuted, fontSize = 11.sp)
+                Text(session.courseCode, color = if (isLive) C.digiRed else C.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(session.title, color = C.textSecondary, fontSize = 12.sp)
+                if (session.room.isNotBlank()) Text(session.room, color = C.textMuted, fontSize = 11.sp)
             }
             when {
                 isLive -> Column(horizontalAlignment = Alignment.End) {
-                    Row(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp))
-                        .border(1.dp, DigiRedBorder, RoundedCornerShape(20.dp))
+                    Row(Modifier.background(C.digiRedSoft, RoundedCornerShape(20.dp))
+                        .border(1.dp, C.digiRedBorder, RoundedCornerShape(20.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        PulsingDot(); Spacer(Modifier.width(4.dp))
-                        Text("Now", color = DigiRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        PulsingDot(color = C.digiRed); Spacer(Modifier.width(4.dp))
+                        Text("Now", color = C.digiRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.height(4.dp))
-                    Text("Tap to check in", color = DigiRed, fontSize = 10.sp)
+                    Text("Tap to check in", color = C.digiRed, fontSize = 10.sp)
                 }
                 isDone -> Box(Modifier.background(SuccessSoft, RoundedCornerShape(20.dp))
                     .border(1.dp, SuccessBorder, RoundedCornerShape(20.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
@@ -681,14 +832,15 @@ fun ClassRow(session: SessionEntity, isLive: Boolean, isDone: Boolean, onCheckIn
 
 @Composable
 fun LeaveCardCompact(leave: LeaveRequestEntity) {
+    val C = LocalColors.current
     val (sc, sb, sbd) = leaveStatusColors(leave.status)
-    Row(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(14.dp))
-        .border(1.dp, DividerColor, RoundedCornerShape(14.dp)).padding(14.dp),
+    Row(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(14.dp))
+        .border(1.dp, C.dividerColor, RoundedCornerShape(14.dp)).padding(14.dp),
         horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(leave.affectedCourseCodes.replace(",", " · "), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(leave.affectedCourseCodes.replace(",", " · "), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Text("${leave.leaveType} · ${fmtDateLong(leave.startDateMs)} – ${fmtDateLong(leave.endDateMs)}",
-                color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                color = C.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
         }
         Spacer(Modifier.width(8.dp))
         Box(Modifier.background(sb, RoundedCornerShape(20.dp)).border(1.dp, sbd, RoundedCornerShape(20.dp))
@@ -710,16 +862,17 @@ fun leaveStatusColors(status: String): Triple<Color, Color, Color> = when (statu
 @Composable
 fun ScheduleCard(session: SessionEntity, isLive: Boolean, isDone: Boolean, onCheckIn: () -> Unit) {
     val alpha by animateFloatAsState(if (isDone) 0.5f else 1f, tween(300), label = "sca")
+    val C = LocalColors.current
     Box(
         Modifier.fillMaxWidth().alpha(alpha)
-            .background(BgCard, RoundedCornerShape(14.dp))
-            .border(1.dp, if (isLive) DigiRed.copy(0.4f) else DividerColor, RoundedCornerShape(14.dp))
+            .background(C.bgCard, RoundedCornerShape(14.dp))
+            .border(1.dp, if (isLive) C.digiRed.copy(0.4f) else C.dividerColor, RoundedCornerShape(14.dp))
     ) {
         if (isLive) {
             val sa by rememberInfiniteTransition(label = "scl").animateFloat(0.4f, 1f,
                 infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "scv")
             Box(Modifier.width(4.dp).fillMaxHeight()
-                .background(DigiRed.copy(sa), RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+                .background(C.digiRed.copy(sa), RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
                 .align(Alignment.CenterStart))
         }
         Column(Modifier.fillMaxWidth().padding(start = if (isLive) 18.dp else 14.dp, top = 14.dp, end = 14.dp, bottom = 14.dp)) {
@@ -727,7 +880,7 @@ fun ScheduleCard(session: SessionEntity, isLive: Boolean, isDone: Boolean, onChe
                 Column(Modifier.weight(1f)) {
                     // Course code + status badge row
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(session.courseCode, color = if (isLive) Color.White else TextPrimary,
+                        Text(session.courseCode, color = if (isLive) C.digiRed else C.textPrimary,
                             fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         when {
                             isLive -> Row(
@@ -751,23 +904,23 @@ fun ScheduleCard(session: SessionEntity, isLive: Boolean, isDone: Boolean, onChe
                         }
                     }
                     Spacer(Modifier.height(3.dp))
-                    Text(session.title, color = TextSecondary, fontSize = 13.sp)
+                    Text(session.title, color = C.textSecondary, fontSize = 13.sp)
                 }
             }
             Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+            HorizontalDivider(color = C.dividerColor, thickness = 0.5.dp)
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Time
                 Column {
-                    Text("TIME", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text("TIME", color = C.textMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}",
-                        color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        color = C.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 // Room
                 if (session.room.isNotBlank()) Column {
-                    Text("ROOM", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text(session.room, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("ROOM", color = C.textMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text(session.room, color = C.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             if (isLive) {
@@ -798,7 +951,8 @@ fun LocationCheckScreen(
     }
     val locationKnown = lastLocation != null || spoofLocation
 
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding()) {
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar(title = "Check-In", onBack = onBack) {
             Box(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp)).border(1.dp, DigiRedBorder, RoundedCornerShape(20.dp))
                 .padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -821,7 +975,7 @@ fun LocationCheckScreen(
                 Box(Modifier.size(16.dp).background(DigiRed, CircleShape))
             }
             Box(Modifier.align(Alignment.TopStart).padding(12.dp).background(Color.Black.copy(0.65f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                Text("📍  SIT@Punggol", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("📍  SIT@Punggol", color = C.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -844,21 +998,21 @@ fun LocationCheckScreen(
                         color = if (locOk) SuccessGreen else if (!locationKnown) TextPrimary else DigiRed,
                         fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(if (locationKnown) "SIT Punggol Campus · GPS verified" else "Please wait…",
-                        color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                        color = C.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                 }
             }
 
             // Session card
-            Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(12.dp))
-                .border(1.dp, DividerColor, RoundedCornerShape(12.dp)).padding(14.dp)) {
+            Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(12.dp))
+                .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp)).padding(14.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(session.courseCode, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        Text(session.title, color = TextSecondary, fontSize = 12.sp)
-                        Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}", color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                        Text(session.courseCode, color = C.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(session.title, color = C.textSecondary, fontSize = 12.sp)
+                        Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}", color = C.textMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     }
-                    if (session.room.isNotBlank()) Box(Modifier.background(BgSurface2, RoundedCornerShape(8.dp)).padding(8.dp)) {
-                        Text(session.room, color = TextSecondary, fontSize = 11.sp)
+                    if (session.room.isNotBlank()) Box(Modifier.background(C.bgSurface2, RoundedCornerShape(8.dp)).padding(8.dp)) {
+                        Text(session.room, color = C.textSecondary, fontSize = 11.sp)
                     }
                 }
             }
@@ -888,7 +1042,7 @@ fun LocationCheckScreen(
                         Text("DEV: Spoof Campus Location", color = if (spoofLocation) Color(0xFFCE93D8) else TextSecondary,
                             fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         Text(if (spoofLocation) "Active — treating you as inside campus" else "Off — using real GPS",
-                            color = TextMuted, fontSize = 11.sp)
+                            color = C.textMuted, fontSize = 11.sp)
                     }
                     Box(Modifier.size(22.dp).background(
                         if (spoofLocation) Color(0xFF7B1FA2) else BgSurface3, RoundedCornerShape(6.dp)),
@@ -921,7 +1075,8 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
         return
     }
 
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding()) {
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("Verify Class", onBack)
 
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),
@@ -929,8 +1084,8 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
 
             // QR section
             FieldLabel("SCAN QR CODE")
-            Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(18.dp))
-                .border(2.dp, if (scannedQr != null) SuccessGreen else DigiRed, RoundedCornerShape(18.dp))
+            Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(18.dp))
+                .border(2.dp, if (scannedQr != null) SuccessGreen else C.digiRed, RoundedCornerShape(18.dp))
                 .padding(20.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (scannedQr != null) {
@@ -950,10 +1105,10 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
                                 }
                             }
                         }
-                        Text(session.courseCode, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text(session.courseCode, color = C.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             PulsingDot(); Spacer(Modifier.width(6.dp))
-                            Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}", color = TextSecondary, fontSize = 12.sp)
+                            Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}", color = C.textSecondary, fontSize = 12.sp)
                         }
                     }
                 }
@@ -966,7 +1121,7 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
             // Divider
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HorizontalDivider(Modifier.weight(1f), color = DividerColor)
-                Text("  OR  ", color = TextMuted, fontSize = 12.sp)
+                Text("  OR  ", color = C.textMuted, fontSize = 12.sp)
                 HorizontalDivider(Modifier.weight(1f), color = DividerColor)
             }
 
@@ -976,7 +1131,7 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
                 (0..5).forEach { i ->
                     val ch   = pin.getOrNull(i)?.toString() ?: ""
                     val focus = i == pin.length
-                    Box(Modifier.weight(1f).aspectRatio(0.88f).background(BgSurface2, RoundedCornerShape(10.dp))
+                    Box(Modifier.weight(1f).aspectRatio(0.88f).background(C.bgSurface2, RoundedCornerShape(10.dp))
                         .border(1.5.dp, if (focus) DigiRed else DividerColor, RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center) {
                         Text(if (ch.isNotBlank()) "•" else if (focus) "|" else "",
@@ -991,7 +1146,7 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
                 if (v.length <= 6 && v.all(Char::isDigit)) { pin = v; pinError = "" }
             },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                label = { Text("Enter PIN here", color = TextMuted, fontSize = 13.sp) },
+                label = { Text("Enter PIN here", color = C.textMuted, fontSize = 13.sp) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 visualTransformation = PasswordVisualTransformation(),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -1015,7 +1170,7 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
 
             // ── DEV: simulate check-in outcomes ─────────────────────
             HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 4.dp))
-            Text("🧪  DEV — Simulate check-in outcome", color = TextMuted, fontSize = 10.sp,
+            Text("🧪  DEV — Simulate check-in outcome", color = C.textMuted, fontSize = 10.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 6.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Force success: inject correct QR
@@ -1026,7 +1181,7 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("✅", fontSize = 18.sp)
                         Text("Force Pass", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Correct QR", color = TextMuted, fontSize = 10.sp)
+                        Text("Correct QR", color = C.textMuted, fontSize = 10.sp)
                     }
                 }
                 // Force fail: inject wrong QR
@@ -1037,7 +1192,7 @@ fun QrPinScreen(session: SessionEntity, onVerified: (String?, String?) -> Unit, 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("❌", fontSize = 18.sp)
                         Text("Force Fail", color = DigiRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Wrong QR", color = TextMuted, fontSize = 10.sp)
+                        Text("Wrong QR", color = C.textMuted, fontSize = 10.sp)
                     }
                 }
             }
@@ -1065,7 +1220,8 @@ fun CheckInSuccessScreen(
     val scale by animateFloatAsState(if (show) 1f else 0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMedium), label = "rs")
     val alpha by animateFloatAsState(if (show) 1f else 0f, tween(400), label = "ca")
 
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding().padding(24.dp),
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.weight(1f))
 
@@ -1077,30 +1233,30 @@ fun CheckInSuccessScreen(
         Spacer(Modifier.height(24.dp))
 
         Column(Modifier.alpha(alpha), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (isOk) "Check-In Successful" else "Check-In Failed", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(if (isOk) "Check-In Successful" else "Check-In Failed", color = C.textPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Text(if (isOk) "Your attendance has been recorded" else (checkInResult?.reason ?: "Please try again"),
-                color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp), textAlign = TextAlign.Center)
+                color = C.textSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp), textAlign = TextAlign.Center)
 
             Spacer(Modifier.height(28.dp))
 
-            Column(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(18.dp))
-                .border(1.dp, DividerColor, RoundedCornerShape(18.dp)).padding(20.dp)) {
+            Column(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(18.dp))
+                .border(1.dp, C.dividerColor, RoundedCornerShape(18.dp)).padding(20.dp)) {
                 mapOf("Class ID" to session.courseCode, "Class" to session.title,
                     "Time" to SimpleDateFormat("dd MMM · h:mm a", Locale.getDefault()).format(Date()),
                     "Status" to (checkInResult?.status ?: "—")).forEach { (label, value) ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(label, color = TextSecondary, fontSize = 13.sp)
-                        Text(value, color = if (label == "Status") sColor else TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(label, color = C.textSecondary, fontSize = 13.sp)
+                        Text(value, color = if (label == "Status") sColor else C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
-                    if (label != "Status") HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+                    if (label != "Status") HorizontalDivider(color = C.dividerColor, thickness = 0.5.dp)
                 }
-                HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+                HorizontalDivider(color = C.dividerColor, thickness = 0.5.dp)
                 Row(Modifier.fillMaxWidth().padding(vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Photo", color = TextSecondary, fontSize = 13.sp)
-                    Box(Modifier.size(46.dp).background(BgSurface2, RoundedCornerShape(10.dp))
-                        .border(1.dp, DigiRedBorder, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                    Text("Photo", color = C.textSecondary, fontSize = 13.sp)
+                    Box(Modifier.size(46.dp).background(C.bgSurface2, RoundedCornerShape(10.dp))
+                        .border(1.dp, C.digiRedBorder, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
                         Text(if (photoUri != null) "🤳" else "—", fontSize = 22.sp)
                     }
                 }
@@ -1133,7 +1289,8 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
         if (submitState is LeaveSubmitState.Success) { vm.clearLeaveSubmitState(); onSubmitted() }
     }
 
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding()) {
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("Leave Request", onBack)
 
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -1151,9 +1308,9 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
                             focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary),
                         shape = RoundedCornerShape(12.dp))
                     ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false },
-                        modifier = Modifier.background(BgCard)) {
+                        modifier = Modifier.background(C.bgCard)) {
                         leaveTypes.forEach { t ->
-                            DropdownMenuItem(text = { Text(t, color = TextPrimary) }, onClick = { leaveType = t; typeExpanded = false },
+                            DropdownMenuItem(text = { Text(t, color = C.textPrimary) }, onClick = { leaveType = t; typeExpanded = false },
                                 modifier = Modifier.background(if (t == leaveType) DigiRedSoft else Color.Transparent))
                         }
                     }
@@ -1165,13 +1322,13 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
                 FieldLabel("DURATION")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf("From" to startMs, "To" to endMs).forEachIndexed { i, (label, ms) ->
-                        Box(Modifier.weight(1f).background(BgSurface2, RoundedCornerShape(12.dp))
-                            .border(1.dp, DividerColor, RoundedCornerShape(12.dp))
+                        Box(Modifier.weight(1f).background(C.bgSurface2, RoundedCornerShape(12.dp))
+                            .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp))
                             .clickable { if (i == 0) startMs += 86_400_000L else endMs += 86_400_000L }
                             .padding(14.dp)) {
                             Column {
-                                Text(label, color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
-                                Text(fmtDateLong(ms), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(label, color = C.textMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                                Text(fmtDateLong(ms), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -1182,13 +1339,14 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
             Column {
                 FieldLabel("CLASSES AFFECTED")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val C = LocalColors.current
                     sessions.forEach { s ->
                         val sel = s.courseCode in selCodes
-                        Box(Modifier.background(if (sel) DigiRedSoft else BgSurface2, RoundedCornerShape(20.dp))
-                            .border(1.dp, if (sel) DigiRedBorder else DividerColor, RoundedCornerShape(20.dp))
+                        Box(Modifier.background(if (sel) C.digiRedSoft else C.bgSurface2, RoundedCornerShape(20.dp))
+                            .border(1.dp, if (sel) C.digiRedBorder else C.dividerColor, RoundedCornerShape(20.dp))
                             .clickable { selCodes = if (sel) selCodes - s.courseCode else selCodes + s.courseCode }
                             .padding(horizontal = 12.dp, vertical = 6.dp)) {
-                            Text(s.courseCode, color = if (sel) DigiRed else TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(s.courseCode, color = if (sel) C.digiRed else C.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1198,7 +1356,7 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
             Column {
                 FieldLabel("SUPPORTING DOCUMENTS")
                 Box(Modifier.fillMaxWidth()
-                    .background(BgSurface2, RoundedCornerShape(12.dp))
+                    .background(C.bgSurface2, RoundedCornerShape(12.dp))
                     .drawBehind {
                         val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
                             width = 2.dp.toPx(),
@@ -1211,7 +1369,7 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("📎", fontSize = 24.sp)
                         Spacer(Modifier.height(4.dp))
-                        Text("MC, letter, or other proof", color = TextSecondary, fontSize = 12.sp)
+                        Text("MC, letter, or other proof", color = C.textSecondary, fontSize = 12.sp)
                         Spacer(Modifier.height(2.dp))
                         Text("Tap to upload", color = DigiRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -1244,7 +1402,8 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
 // ─────────────────────────────────────────────────────────────
 @Composable
 fun LeaveListScreen(leaveList: List<LeaveRequestEntity>, onBack: () -> Unit, onNewLeave: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding()) {
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("My Leave", onBack) {
             IconButton(onClick = onNewLeave) { Icon(Icons.Default.Add, null, tint = DigiRed) }
         }
@@ -1253,8 +1412,8 @@ fun LeaveListScreen(leaveList: List<LeaveRequestEntity>, onBack: () -> Unit, onN
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("📄", fontSize = 48.sp); Spacer(Modifier.height(12.dp))
-                    Text("No Leave Requests", color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    Text("Tap + to submit a new request", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text("No Leave Requests", color = C.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Text("Tap + to submit a new request", color = C.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             }
         } else {
@@ -1270,30 +1429,31 @@ fun LeaveListScreen(leaveList: List<LeaveRequestEntity>, onBack: () -> Unit, onN
 
 @Composable
 fun LeaveCardFull(leave: LeaveRequestEntity) {
+    val C = LocalColors.current
     val (sc, sb, sbd) = leaveStatusColors(leave.status)
-    Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp)).border(1.dp, DividerColor, RoundedCornerShape(16.dp))) {
+    Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(16.dp)).border(1.dp, C.dividerColor, RoundedCornerShape(16.dp))) {
         Box(Modifier.width(4.dp).fillMaxHeight().background(sc, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).align(Alignment.CenterStart))
         Column(Modifier.fillMaxWidth().padding(start = 18.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text(leave.affectedCourseCodes.split(",").joinToString(" · "), color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text(leave.leaveType, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(leave.affectedCourseCodes.split(",").joinToString(" · "), color = C.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(leave.leaveType, color = C.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
                 }
                 Box(Modifier.background(sb, RoundedCornerShape(20.dp)).border(1.dp, sbd, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
                     Text(leave.status.lowercase().replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 10.dp))
+            HorizontalDivider(color = C.dividerColor, modifier = Modifier.padding(vertical = 10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("📅", fontSize = 13.sp); Spacer(Modifier.width(6.dp))
-                Text("${fmtDateLong(leave.startDateMs)} – ${fmtDateLong(leave.endDateMs)}", color = TextSecondary, fontSize = 12.sp)
+                Text("${fmtDateLong(leave.startDateMs)} – ${fmtDateLong(leave.endDateMs)}", color = C.textSecondary, fontSize = 12.sp)
             }
             if (leave.documentUri != null) {
                 Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) { Text("📎", fontSize = 13.sp); Spacer(Modifier.width(6.dp)); Text("Document attached", color = TextMuted, fontSize = 12.sp) }
+                Row(verticalAlignment = Alignment.CenterVertically) { Text("📎", fontSize = 13.sp); Spacer(Modifier.width(6.dp)); Text("Document attached", color = C.textMuted, fontSize = 12.sp) }
             }
-            if (leave.status == "REJECTED" && leave.rejectionReason != null) { Spacer(Modifier.height(6.dp)); Text("✕ ${leave.rejectionReason}", color = DigiRed, fontSize = 12.sp) }
-            if (leave.status == "APPROVED" && leave.reviewedBy != null) { Spacer(Modifier.height(6.dp)); Text("✓ Approved by ${leave.reviewedBy}", color = SuccessGreen, fontSize = 12.sp) }
+            if (leave.status == "REJECTED" && leave.rejectionReason != null) { Spacer(Modifier.height(6.dp)); Text("✕ ${leave.rejectionReason}", color = C.digiRed, fontSize = 12.sp) }
+            if (leave.status == "APPROVED" && leave.reviewedBy != null) { Spacer(Modifier.height(6.dp)); Text("✓ Approved by ${leave.reviewedBy}", color = C.successGreen, fontSize = 12.sp) }
         }
     }
 }
@@ -1313,10 +1473,14 @@ fun ProfDashboardScreen(
     sessions: List<SessionEntity>,
     onOpenClass: (SessionEntity) -> Unit,
     onViewAttendance: (SessionEntity) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.DARK,
+    onThemeChange: (ThemeMode) -> Unit = {}
 ) {
+    val C = LocalColors.current
     val userName  by vm.currentUserName.collectAsState()
     val profId    by vm.currentStudentId.collectAsState()
+    val role      by vm.currentRole.collectAsState()
     val initials  = userName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("")
     val now       = System.currentTimeMillis()
     var tab by remember { mutableStateOf(0) }
@@ -1324,10 +1488,10 @@ fun ProfDashboardScreen(
     // Demo attendance numbers per session (replace with real DB query later)
     val demoStats = mapOf("s1" to Triple(18, 2, 1), "s2" to Triple(22, 3, 2), "s3" to Triple(30, 0, 0))
 
-    Scaffold(containerColor = BgPage,
+    Scaffold(containerColor = C.bgPage,
         bottomBar = {
-            NavigationBar(containerColor = BgCard, tonalElevation = 0.dp,
-                modifier = Modifier.border(BorderStroke(1.dp, DividerColor), RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))) {
+            NavigationBar(containerColor = C.navBarColor, tonalElevation = 0.dp,
+                modifier = Modifier.border(BorderStroke(1.dp, C.navBarBorder), RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))) {
                 listOf(Triple(0, Icons.Default.Home, "Home"),
                     Triple(1, Icons.Default.DateRange, "Classes"),
                     Triple(2, Icons.Default.List, "Leave"),
@@ -1335,9 +1499,9 @@ fun ProfDashboardScreen(
                     NavigationBarItem(selected = tab == idx, onClick = { tab = idx },
                         icon = { Icon(icon, null) }, label = { Text(label, fontSize = 10.sp) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = DigiRed, selectedTextColor = DigiRed,
-                            unselectedIconColor = TextMuted, unselectedTextColor = TextMuted,
-                            indicatorColor = DigiRedSoft))
+                            selectedIconColor = C.digiRed, selectedTextColor = C.digiRed,
+                            unselectedIconColor = Color.White.copy(0.45f), unselectedTextColor = Color.White.copy(0.45f),
+                            indicatorColor = C.digiRedSoft))
                 }
             }
         }
@@ -1346,24 +1510,24 @@ fun ProfDashboardScreen(
 
             // ── Shared header ────────────────────────────────────────
             Box(Modifier.fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color(0xFF1A0005), BgPage)))
+                .background(Brush.verticalGradient(listOf(C.headerGradientTop, C.bgPage)))
                 .statusBarsPadding().padding(horizontal = 20.dp, vertical = 20.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                     Column {
-                        Text("Prof. Dashboard", color = TextSecondary, fontSize = 12.sp, letterSpacing = 0.5.sp)
-                        Text(userName, color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("Prof. Dashboard", color = Color.White.copy(0.6f), fontSize = 12.sp, letterSpacing = 0.5.sp)
+                        Text(userName, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp))
                             .border(1.dp, DigiRedBorder, RoundedCornerShape(20.dp))
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(6.dp).background(DigiRed, CircleShape))
+                            Box(Modifier.size(6.dp).background(C.digiRed, CircleShape))
                             Spacer(Modifier.width(6.dp))
-                            Text(profId, color = DigiRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+                            Text(profId, color = C.digiRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
                         }
                     }
                     Box(Modifier.size(42.dp)
-                        .background(Brush.radialGradient(listOf(DigiRedDark, DigiRed)), CircleShape)
+                        .background(Brush.radialGradient(listOf(C.digiRedDark, C.digiRed)), CircleShape)
                         .clickable { onLogout() }, contentAlignment = Alignment.Center) {
                         Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
@@ -1375,7 +1539,7 @@ fun ProfDashboardScreen(
                 // HOME: today's classes with stats + pending leave summary
                 0 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                     Text("📅  TODAY — ${fmtDate(now)}",
-                        color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
+                        color = C.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
                         modifier = Modifier.padding(bottom = 10.dp))
                     sessions.forEach { session ->
                         val status = sessionStatus(session)
@@ -1387,7 +1551,7 @@ fun ProfDashboardScreen(
                         Spacer(Modifier.height(10.dp))
                     }
                     Spacer(Modifier.height(20.dp))
-                    Text("PENDING LEAVE REQUESTS", color = TextMuted, fontSize = 10.sp,
+                    Text("PENDING LEAVE REQUESTS", color = C.textMuted, fontSize = 10.sp,
                         fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(bottom = 10.dp))
                     profDemoLeave.forEach { leave ->
                         ProfLeaveRow(leave)
@@ -1398,7 +1562,7 @@ fun ProfDashboardScreen(
 
                 // CLASSES: full class list (all sessions, expandable to open class access)
                 1 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-                    Text("ALL CLASSES", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    Text("ALL CLASSES", color = C.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp, modifier = Modifier.padding(bottom = 12.dp))
                     sessions.forEach { session ->
                         val status = sessionStatus(session)
@@ -1414,13 +1578,13 @@ fun ProfDashboardScreen(
 
                 // LEAVE: all student leave requests visible to professor
                 2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-                    Text("STUDENT LEAVE REQUESTS", color = TextMuted, fontSize = 10.sp,
+                    Text("STUDENT LEAVE REQUESTS", color = C.textMuted, fontSize = 10.sp,
                         fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.padding(bottom = 12.dp))
                     if (profDemoLeave.isEmpty()) {
-                        Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(14.dp))
-                            .border(1.dp, DividerColor, RoundedCornerShape(14.dp)).padding(24.dp),
+                        Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(14.dp))
+                            .border(1.dp, C.dividerColor, RoundedCornerShape(14.dp)).padding(24.dp),
                             contentAlignment = Alignment.Center) {
-                            Text("No pending leave requests", color = TextMuted, fontSize = 13.sp)
+                            Text("No pending leave requests", color = C.textMuted, fontSize = 13.sp)
                         }
                     } else {
                         profDemoLeave.forEach { leave ->
@@ -1432,19 +1596,15 @@ fun ProfDashboardScreen(
                 }
 
                 // PROFILE
-                else -> Column(Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Box(Modifier.size(72.dp).background(Brush.radialGradient(listOf(DigiRedDark, DigiRed)), CircleShape),
-                        contentAlignment = Alignment.Center) {
-                        Text(initials, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text(userName, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text(profId, color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
-                    Text("Professor", color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-                    Spacer(Modifier.height(32.dp))
-                    DigiButton("Sign Out", onClick = onLogout, modifier = Modifier.fillMaxWidth(0.6f), outlined = true)
-                }
+                else -> ProfileTab(
+                    userName    = userName,
+                    userId      = profId,
+                    role        = role,
+                    initials    = initials,
+                    themeMode   = themeMode,
+                    onThemeChange = onThemeChange,
+                    onLogout    = onLogout
+                )
             }
         }
     }
@@ -1453,19 +1613,20 @@ fun ProfDashboardScreen(
 @Composable
 fun ProfLeaveRow(student: StudentAttendanceRow, showActions: Boolean = false) {
     val initials = student.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("")
+    val C = LocalColors.current
     Row(
-        Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(12.dp))
-            .border(1.dp, DividerColor, RoundedCornerShape(12.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(12.dp))
+            .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(38.dp).background(InfoBlueSoft, CircleShape).border(1.dp, InfoBlueBorder, CircleShape),
+        Box(Modifier.size(38.dp).background(C.infoBlueSoft, CircleShape).border(1.dp, C.infoBlueBorder, CircleShape),
             contentAlignment = Alignment.Center) {
-            Text(initials, color = InfoBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(initials, color = C.infoBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(student.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text("${student.studentId} · ${student.note}", color = TextSecondary, fontSize = 12.sp)
+            Text(student.name, color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("${student.studentId} · ${student.note}", color = C.textSecondary, fontSize = 12.sp)
         }
         if (showActions) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1498,15 +1659,16 @@ fun ProfClassCard(
     onOpen: () -> Unit,
     onAttendance: () -> Unit
 ) {
+    val C = LocalColors.current
     Box(Modifier.fillMaxWidth()
-        .background(BgCard, RoundedCornerShape(14.dp))
-        .border(1.dp, if (isLive) Color.White.copy(0.12f) else DividerColor, RoundedCornerShape(14.dp))) {
+        .background(C.bgCard, RoundedCornerShape(14.dp))
+        .border(1.dp, if (isLive) C.digiRedBorder else C.dividerColor, RoundedCornerShape(14.dp))) {
 
         if (isLive) {
             val sa by rememberInfiniteTransition(label = "ps").animateFloat(0.5f, 1f,
                 infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "sv")
             Box(Modifier.width(3.dp).fillMaxHeight()
-                .background(DigiRed.copy(sa), RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+                .background(C.digiRed.copy(sa), RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
                 .align(Alignment.CenterStart))
         }
 
@@ -1515,10 +1677,10 @@ fun ProfClassCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text("${fmtTime(session.startTimeMs)} – ${fmtTime(session.endTimeMs)}",
-                        color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        color = C.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(2.dp))
-                    Text(session.courseCode, color = if (isLive) Color.White else TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("${session.title} · ${session.room}", color = TextSecondary, fontSize = 12.sp)
+                    Text(session.courseCode, color = if (isLive) C.digiRed else C.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("${session.title} · ${session.room}", color = C.textSecondary, fontSize = 12.sp)
                 }
                 when {
                     isLive -> Row(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp))
@@ -1529,7 +1691,7 @@ fun ProfClassCard(
                         Text("LIVE", color = DigiRed, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     }
                     isDone -> Box(Modifier.background(BgSurface3, RoundedCornerShape(20.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                        Text("DONE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("DONE", color = C.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     }
                     else -> Box(Modifier.background(InfoBlueSoft, RoundedCornerShape(20.dp))
                         .border(1.dp, InfoBlueBorder, RoundedCornerShape(20.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
@@ -1553,6 +1715,7 @@ fun ProfClassCard(
 
 @Composable
 fun AttendanceStatBox(value: String, label: String, color: Color, bg: Color, border: Color, modifier: Modifier = Modifier) {
+    val C = LocalColors.current
     Box(modifier.background(bg, RoundedCornerShape(10.dp)).border(1.dp, border, RoundedCornerShape(10.dp)).padding(vertical = 10.dp),
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1575,7 +1738,8 @@ fun ClassAccessScreen(
     var extensionMins   by remember { mutableStateOf(10) }
     var extended        by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding()) {
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("CLASS ACCESS", onBack) {
             Box(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp))
                 .border(1.dp, DigiRedBorder, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -1588,10 +1752,10 @@ fun ClassAccessScreen(
 
             // QR Code card
             Column {
-                Text("QR CODE", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+                Text("QR CODE", color = C.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
                     modifier = Modifier.padding(bottom = 10.dp))
-                Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp))
-                    .border(1.dp, DividerColor, RoundedCornerShape(16.dp)).padding(20.dp),
+                Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(16.dp))
+                    .border(1.dp, C.dividerColor, RoundedCornerShape(16.dp)).padding(20.dp),
                     contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         // QR visual
@@ -1626,16 +1790,16 @@ fun ClassAccessScreen(
             }
 
             // Session password row
-            Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(12.dp))
-                .border(1.dp, DividerColor, RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(12.dp))
+                .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Session Password · fixed for class", color = TextSecondary, fontSize = 12.sp)
+                        Text("Session Password · fixed for class", color = C.textSecondary, fontSize = 12.sp)
                         Spacer(Modifier.height(4.dp))
                         Text(
                             if (showPassword) session.classPassword
                             else session.classPassword.take(2) + " " + "●".repeat(session.classPassword.length - 2),
-                            color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp
+                            color = C.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp
                         )
                     }
                     TextButton(onClick = { showPassword = !showPassword }) {
@@ -1645,15 +1809,15 @@ fun ClassAccessScreen(
             }
 
             // Extend check-in window
-            Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(12.dp))
-                .border(1.dp, DividerColor, RoundedCornerShape(12.dp)).padding(16.dp)) {
+            Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(12.dp))
+                .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp)).padding(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("⏱", fontSize = 16.sp)
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text("Extend Check-In Window", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Currently: ${extensionMins} min window", color = TextSecondary, fontSize = 12.sp)
+                            Text("Extend Check-In Window", color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Currently: ${extensionMins} min window", color = C.textSecondary, fontSize = 12.sp)
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1663,7 +1827,7 @@ fun ClassAccessScreen(
                             contentAlignment = Alignment.Center) {
                             Text("−", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         }
-                        Text("${extensionMins}m", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        Text("${extensionMins}m", color = C.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.defaultMinSize(minWidth = 48.dp), textAlign = TextAlign.Center)
                         Box(Modifier.size(36.dp).background(DigiRed, RoundedCornerShape(8.dp))
                             .clickable { extensionMins += 5 },
@@ -1722,7 +1886,8 @@ fun AttendanceListScreen(session: SessionEntity, onBack: () -> Unit) {
     val absent  = roster.count { it.status == "ABSENT" }
     val leave   = roster.count { it.status == "LEAVE" }
 
-    Column(Modifier.fillMaxSize().background(BgPage).statusBarsPadding().navigationBarsPadding()) {
+    val C = LocalColors.current
+    Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("ATTENDANCE", onBack) {
             Box(Modifier.background(DigiRedSoft, RoundedCornerShape(20.dp))
                 .border(1.dp, DigiRedBorder, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -1762,8 +1927,9 @@ fun StudentAttendanceCard(student: StudentAttendanceRow) {
 
     val initials = student.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("")
 
-    Box(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(14.dp))
-        .border(1.dp, DividerColor, RoundedCornerShape(14.dp))) {
+    val C = LocalColors.current
+    Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(14.dp))
+        .border(1.dp, C.dividerColor, RoundedCornerShape(14.dp))) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             // Avatar
             Box(Modifier.size(40.dp).background(
@@ -1783,8 +1949,8 @@ fun StudentAttendanceCard(student: StudentAttendanceRow) {
 
             // Name & ID
             Column(Modifier.weight(1f)) {
-                Text(student.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(student.studentId, color = TextSecondary, fontSize = 12.sp)
+                Text(student.name, color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(student.studentId, color = C.textSecondary, fontSize = 12.sp)
             }
 
             // Status + time + action
@@ -1798,8 +1964,8 @@ fun StudentAttendanceCard(student: StudentAttendanceRow) {
                             color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
                         )
                     }
-                    if (student.note.isNotBlank()) Text(student.note, color = TextSecondary, fontSize = 10.sp)
-                    if (student.status == "LATE" && student.checkInTime != "—") Text(student.checkInTime, color = TextSecondary, fontSize = 10.sp)
+                    if (student.note.isNotBlank()) Text(student.note, color = C.textSecondary, fontSize = 10.sp)
+                    if (student.status == "LATE" && student.checkInTime != "—") Text(student.checkInTime, color = C.textSecondary, fontSize = 10.sp)
                 }
 
                 // Action button
@@ -1818,6 +1984,159 @@ fun StudentAttendanceCard(student: StudentAttendanceRow) {
                         Text("📞", fontSize = 14.sp) // placeholder contact action
                     }
                 }
+            }
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  PROFILE TAB  (shared by Student + Professor dashboards)
+// ─────────────────────────────────────────────────────────────
+@Composable
+fun ProfileTab(
+    userName: String,
+    userId: String,
+    role: String,
+    initials: String,
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
+    onLogout: () -> Unit
+) {
+    val C = LocalColors.current
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
+    ) {
+        Spacer(Modifier.height(24.dp))
+
+        // ── Avatar + name ────────────────────────────────────
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier.size(80.dp)
+                    .background(Brush.radialGradient(listOf(C.digiRedDark, C.digiRed)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initials, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(userName, color = C.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(userId, color = C.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        // ── Account section ───────────────────────────────────
+        Text("ACCOUNT", color = C.textMuted, fontSize = 10.sp,
+            fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(bottom = 8.dp))
+
+        val cardBorderWidth = if (C.isDark) 1.dp else 1.5.dp
+        val dividerThickness = if (C.isDark) 0.5.dp else 1.dp
+        val dividerColor = if (C.isDark) C.dividerColor else Color(0xFFD1D1D6)
+        Box(
+            Modifier.fillMaxWidth()
+                .background(C.bgCard, RoundedCornerShape(14.dp))
+                .border(cardBorderWidth, if (C.isDark) C.dividerColor else Color(0xFFCCCCCE), RoundedCornerShape(14.dp))
+        ) {
+            Column {
+                ProfileInfoRow("Name",   userName,  C, Icons.Default.Person)
+                HorizontalDivider(color = dividerColor, thickness = dividerThickness, modifier = Modifier.padding(horizontal = 0.dp))
+                ProfileInfoRow("ID",     userId,    C, Icons.Default.AccountBox)
+                HorizontalDivider(color = dividerColor, thickness = dividerThickness, modifier = Modifier.padding(horizontal = 0.dp))
+                ProfileInfoRow("Role",   role.replaceFirstChar { it.uppercase() }, C, Icons.Default.AccountCircle)
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // ── Appearance section ────────────────────────────────
+        Text("APPEARANCE", color = C.textMuted, fontSize = 10.sp,
+            fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(bottom = 8.dp))
+
+        Box(
+            Modifier.fillMaxWidth()
+                .background(C.bgCard, RoundedCornerShape(14.dp))
+                .border(cardBorderWidth, if (C.isDark) C.dividerColor else Color(0xFFCCCCCE), RoundedCornerShape(14.dp))
+        ) {
+            Column {
+                ThemeOption(
+                    label    = "Dark",
+                    emoji    = "🌙",
+                    selected = themeMode == ThemeMode.DARK,
+                    C        = C,
+                    onClick  = { onThemeChange(ThemeMode.DARK) }
+                )
+                HorizontalDivider(color = dividerColor, thickness = dividerThickness, modifier = Modifier.padding(horizontal = 0.dp))
+                ThemeOption(
+                    label    = "Light",
+                    emoji    = "☀️",
+                    selected = themeMode == ThemeMode.LIGHT,
+                    C        = C,
+                    onClick  = { onThemeChange(ThemeMode.LIGHT) }
+                )
+                HorizontalDivider(color = dividerColor, thickness = dividerThickness, modifier = Modifier.padding(horizontal = 0.dp))
+                ThemeOption(
+                    label    = "Follow System",
+                    emoji    = "📱",
+                    selected = themeMode == ThemeMode.SYSTEM,
+                    C        = C,
+                    onClick  = { onThemeChange(ThemeMode.SYSTEM) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        // ── Sign out ──────────────────────────────────────────
+        DigiButton("Sign Out", onClick = onLogout, modifier = Modifier.fillMaxWidth(), outlined = true)
+
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun ProfileInfoRow(label: String, value: String, C: AppColors, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = C.textMuted, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, color = C.textMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+            Text(value, color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
+
+@Composable
+private fun ThemeOption(label: String, emoji: String, selected: Boolean, C: AppColors, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable { onClick() }
+            .background(if (selected) C.digiRedSoft else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(emoji, fontSize = 18.sp)
+        Spacer(Modifier.width(14.dp))
+        Text(label, color = if (selected) C.digiRed else C.textPrimary,
+            fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.weight(1f))
+        if (selected) {
+            Box(
+                Modifier.size(20.dp)
+                    .background(C.digiRed, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
