@@ -1800,7 +1800,7 @@ fun ProfDashboardScreen(
     var tab by remember { mutableStateOf(0) }
 
     // Demo attendance numbers per session (replace with real DB query later)
-    val demoStats = mapOf("s1" to Triple(18, 2, 1), "s2" to Triple(22, 3, 2), "s3" to Triple(30, 0, 0))
+    val demoStats = mapOf("s1" to Triple(18, 2, 1), "s2" to Triple(5, 2, 2), "s3" to Triple(30, 0, 0))
 
     Scaffold(containerColor = C.bgPage,
         bottomBar = {
@@ -2118,7 +2118,10 @@ fun ProfClassCard(
     val C = LocalColors.current
     Box(Modifier.fillMaxWidth()
         .background(C.bgCard, RoundedCornerShape(14.dp))
-        .border(1.dp, if (isLive) C.digiRedBorder else C.dividerColor, RoundedCornerShape(14.dp))) {
+        // Added the clickable modifier here:
+        .border(1.dp, if (isLive) C.digiRedBorder else C.dividerColor, RoundedCornerShape(14.dp))
+        .clickable { onOpen() }
+    ) {
 
         if (isLive) {
             val sa by rememberInfiniteTransition(label = "ps").animateFloat(0.5f, 1f,
@@ -2345,22 +2348,62 @@ data class StudentAttendanceRow(
 
 @Composable
 fun AttendanceListScreen(session: SessionEntity, onBack: () -> Unit) {
-    // Demo roster replace with real attendanceDao.observeSessionAttendance(session.sessionId)
+    val C = LocalColors.current
+    val now = System.currentTimeMillis()
+    val hasStarted = now >= session.startTimeMs //
+
+    // Convert the hardcoded roster into a mutableStateList so the UI refreshes on edit
     val roster = remember {
-        listOf(
-            StudentAttendanceRow("Alex Tan",   "2200123", "PRESENT", "10:03", "On time"),
-            StudentAttendanceRow("Sarah Lim",  "2200089", "PRESENT", "10:08", "On time"),
-            StudentAttendanceRow("Joel Ng",    "2200201", "ABSENT",  "—"),
-            StudentAttendanceRow("Maya Koh",   "2200147", "LATE",    "10:19"),
-            StudentAttendanceRow("Raj Joshi",  "2200305", "LEAVE",   "—")
+        mutableStateListOf(
+            StudentAttendanceRow("Alex Tan",    "2200123", "PRESENT", "10:03", "On time"),
+            StudentAttendanceRow("Sarah Lim",   "2200089", "PRESENT", "10:08", "On time"),
+            StudentAttendanceRow("Joel Ng",     "2200201", "ABSENT",  "—"),
+            StudentAttendanceRow("Maya Koh",    "2200147", "LATE",    "10:19", "Traffic"),
+            StudentAttendanceRow("Raj Joshi",   "2200305", "LEAVE",   "—",     "Medical"),
+            StudentAttendanceRow("Dylan Lau",   "2301242", "PRESENT", "09:55", "Early"),
+            StudentAttendanceRow("Emily Chen",  "2201944", "ABSENT",  "—"),
+            StudentAttendanceRow("Kevin Tay",   "2304411", "PRESENT", "10:01", "On time"),
+            StudentAttendanceRow("Chloe Singh", "2208832", "LEAVE",   "—",     "Compassionate")
         )
     }
 
-    val present = roster.count { it.status == "PRESENT" }
-    val absent  = roster.count { it.status == "ABSENT" }
-    val leave   = roster.count { it.status == "LEAVE" }
+    // State for managing the edit dialog
+    var studentToEdit by remember { mutableStateOf<StudentAttendanceRow?>(null) }
+    var selectedTab by remember { mutableStateOf("All") }
+    val tabs = listOf("All", "Present", "Absent", "Leave")
 
-    val C = LocalColors.current
+    // ── Manual Overwrite Dialog ──
+    if (studentToEdit != null) {
+        AlertDialog(
+            onDismissRequest = { studentToEdit = null },
+            title = { Text("Manual Overwrite", color = C.textPrimary) },
+            text = { Text("Mark ${studentToEdit?.name} as Present (Manual Override)?", color = C.textSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val index = roster.indexOf(studentToEdit)
+                    if (index != -1) {
+                        // Update the reactive list to trigger a UI refresh
+                        roster[index] = studentToEdit!!.copy(
+                            status = "PRESENT",
+                            checkInTime = fmtTime(System.currentTimeMillis()),
+                            note = "Manual Override"
+                        )
+                    }
+                    studentToEdit = null
+                }) { Text("Confirm", color = C.successGreen, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { studentToEdit = null }) { Text("Cancel", color = C.textPrimary) }
+            },
+            containerColor = C.bgCard
+        )
+    }
+
+    // Logic: Only show data for Present/Absent if class has actually started
+    val presentCount = if (hasStarted) roster.count { it.status == "PRESENT" || it.status == "LATE" } else 0
+    val absentCount  = if (hasStarted) roster.count { it.status == "ABSENT" } else 0
+    val leaveCount   = roster.count { it.status == "LEAVE" }
+
     Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("ATTENDANCE", onBack) {
             Box(Modifier.background(C.digiRedSoft, RoundedCornerShape(20.dp))
@@ -2369,28 +2412,75 @@ fun AttendanceListScreen(session: SessionEntity, onBack: () -> Unit) {
             }
         }
 
-        // Stats strip
+        // Stats Summary Strip
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AttendanceStatBox("$present", "PRESENT", Modifier.weight(1f))
-            AttendanceStatBox("$absent",  "ABSENT",  Modifier.weight(1f))
-            AttendanceStatBox("$leave",   "LEAVE",   Modifier.weight(1f))
+            AttendanceStatBox("$presentCount", "PRESENT", Modifier.weight(1f))
+            AttendanceStatBox("$absentCount",  "ABSENT",  Modifier.weight(1f))
+            AttendanceStatBox("$leaveCount",   "LEAVE",   Modifier.weight(1f))
         }
 
-        // Student list
+        // Navigation Filter Tabs
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            tabs.forEach { tab ->
+                val isSelected = selectedTab == tab
+                Box(Modifier.weight(1f).background(if (isSelected) C.digiRed else C.bgSurface2, RoundedCornerShape(8.dp))
+                    .border(1.dp, if (isSelected) C.digiRedDark else C.dividerColor, RoundedCornerShape(8.dp))
+                    .clickable { selectedTab = tab }.padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center) {
+                    Text(tab, color = if (isSelected) Color.White else C.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Filtering logic: hide data if early, otherwise apply tab filter
+        val displayRoster = roster.filter { student ->
+            val isLeave = student.status == "LEAVE"
+            if (!hasStarted && !isLeave) return@filter false
+
+            when (selectedTab) {
+                "Present" -> student.status == "PRESENT" || student.status == "LATE"
+                "Absent"  -> student.status == "ABSENT"
+                "Leave"   -> isLeave
+                else      -> true
+            }
+        }
+
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Spacer(Modifier.height(4.dp))
-            roster.forEach { student ->
-                StudentAttendanceCard(student)
+
+            if (displayRoster.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (!hasStarted) "Attendance opens at ${fmtTime(session.startTimeMs)}"
+                        else "No students found in this category",
+                        color = C.textMuted, fontSize = 14.sp, textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                displayRoster.forEach { student ->
+                    StudentAttendanceCard(
+                        student = student,
+                        onEdit = { studentToEdit = student } // Triggers the Manual Overwrite dialog
+                    )
+                }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-fun StudentAttendanceCard(student: StudentAttendanceRow) {
+fun StudentAttendanceCard(
+    student: StudentAttendanceRow,
+    onEdit: () -> Unit = {},
+    onView: () -> Unit = {}
+) {
+    val C = LocalColors.current
+
+    // Determine colors and icons based on student status
     val (statusColor, statusBg, statusBorder, statusIcon) = when (student.status) {
         "PRESENT" -> Quadruple(C.successGreen, C.successSoft,  C.successBorder, "✓")
         "LATE"    -> Quadruple(C.warningAmber, C.warningBg,   C.warningBorder, "△")
@@ -2401,11 +2491,11 @@ fun StudentAttendanceCard(student: StudentAttendanceRow) {
 
     val initials = student.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("")
 
-    val C = LocalColors.current
     Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(14.dp))
         .border(1.dp, C.dividerColor, RoundedCornerShape(14.dp))) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Avatar
+
+            // Avatar with radial gradient
             Box(Modifier.size(40.dp).background(
                 Brush.radialGradient(listOf(
                     when (student.status) {
@@ -2421,48 +2511,64 @@ fun StudentAttendanceCard(student: StudentAttendanceRow) {
 
             Spacer(Modifier.width(12.dp))
 
-            // Name & ID
+            // Student Identity Info
             Column(Modifier.weight(1f)) {
                 Text(student.name, color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text(student.studentId, color = C.textSecondary, fontSize = 12.sp)
             }
 
-            // Status + time + action
+            // Status details and Action Buttons
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(horizontalAlignment = Alignment.End) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(statusIcon, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            if (student.status == "LEAVE") "Leave" else if (student.status == "ABSENT") "Absent" else if (student.status == "LATE") "Late" else student.checkInTime,
+                            text = when(student.status) {
+                                "LEAVE" -> "Leave"
+                                "ABSENT" -> "Absent"
+                                "LATE" -> "Late"
+                                else -> student.checkInTime
+                            },
                             color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
                         )
                     }
-                    if (student.note.isNotBlank()) Text(student.note, color = C.textSecondary, fontSize = 10.sp)
-                    if (student.status == "LATE" && student.checkInTime != "—") Text(student.checkInTime, color = C.textSecondary, fontSize = 10.sp)
+                    // Show note (e.g., "Manual Override") if it exists
+                    if (student.note.isNotBlank()) {
+                        Text(student.note, color = C.textSecondary, fontSize = 10.sp)
+                    }
                 }
 
-                // Action button
+                // Dynamic Action Button based on status
                 when (student.status) {
-                    "ABSENT" -> Box(Modifier.background(C.digiRed, RoundedCornerShape(8.dp))
-                        .clickable { /* TODO: edit attendance */ }.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        Text("EDIT", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    "ABSENT" -> {
+                        // Edit button for marking as Present
+                        Box(Modifier.background(C.digiRed, RoundedCornerShape(8.dp))
+                            .clickable { onEdit() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                            Text("EDIT", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                        }
                     }
-                    "LEAVE" -> Box(Modifier.background(C.infoBlueSoft, RoundedCornerShape(8.dp))
-                        .border(1.dp, C.infoBlueBorder, RoundedCornerShape(8.dp))
-                        .clickable { /* TODO: view leave doc */ }.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        Text("VIEW", color = C.infoBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    "LEAVE" -> {
+                        // View button for checking medical certificates
+                        Box(Modifier.background(C.infoBlueSoft, RoundedCornerShape(8.dp))
+                            .border(1.dp, C.infoBlueBorder, RoundedCornerShape(8.dp))
+                            .clickable { onView() }.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                            Text("VIEW", color = C.infoBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                        }
                     }
-                    else -> Box(Modifier.background(C.bgSurface3, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 6.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
-                        Text("📞", fontSize = 14.sp) // placeholder contact action
+                    else -> {
+                        // Default placeholder for Present students
+                        Box(Modifier.background(C.bgSurface3, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 6.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                            Text("📞", fontSize = 14.sp)
+                        }
                     }
                 }
             }
         }
     }
 }
-
 
 //  PROFILE TAB  (shared by Student + Professor dashboards)
 @Composable
