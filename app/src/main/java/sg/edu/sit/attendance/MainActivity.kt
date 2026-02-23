@@ -42,9 +42,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import sg.edu.sit.attendance.camera.PhotoCaptureScreen
 import sg.edu.sit.attendance.data.DbProvider
 import sg.edu.sit.attendance.data.LeaveRequestEntity
@@ -433,7 +435,17 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
                             session       = selectedSession!!,
                             checkInResult = checkInResult,
                             photoUri      = photoUri,
-                            onDone        = { resetCheckIn(); goTo(Screen.Dashboard) }
+                            onDone        = {
+                                // 23/02/2026 Change, edited so that failure screen doesn't show for a brief
+                                // moment before it takes the user back to the home screen
+                                goTo(Screen.Dashboard)
+
+                                // Success screen doesn't "flip" to Failure during the slide-out
+                                vm.viewModelScope.launch {
+                                    delay(500) // wait for animation to finish
+                                    resetCheckIn()
+                                }
+                            }
                         )
                         Screen.LeaveForm -> LeaveFormScreen(
                             vm          = vm,
