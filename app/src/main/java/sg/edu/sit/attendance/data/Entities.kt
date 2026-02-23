@@ -17,6 +17,16 @@ data class UserEntity(
     val createdAtMs: Long = System.currentTimeMillis()
 )
 
+// data/AccountEntity.kt
+@Entity(tableName = "accounts")
+data class AccountEntity(
+    @PrimaryKey val username: String,
+    val passwordHash: String,
+    val studentName: String,
+    val role: String = "STUDENT",
+    val createdAtMs: Long = System.currentTimeMillis()
+)
+
 @Entity(tableName = "groups")
 data class GroupEntity(
     @PrimaryKey val groupId: String,

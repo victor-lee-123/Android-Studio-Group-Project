@@ -15,6 +15,15 @@ import sg.edu.sit.attendance.data.AttendanceEntity
 import sg.edu.sit.attendance.data.LeaveRequestEntity
 import sg.edu.sit.attendance.data.SessionEntity
 import sg.edu.sit.attendance.repo.AttendanceRepository
+import sg.edu.sit.attendance.data.AccountEntity
+import sg.edu.sit.attendance.data.DbProvider
+import sg.edu.sit.attendance.auth.LocalAuthRepository
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import sg.edu.sit.attendance.auth.LocalSession
 
 // ── Demo credentials ─────────────────────────────────────────────────────────
 // Student:   username = alex.t      password = password123
@@ -39,56 +48,109 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+
     private val repo = AttendanceRepository(app.applicationContext)
-    private val auth = FirebaseAuth.getInstance()
+
+    private val db = DbProvider.get(app.applicationContext)
+    private val authRepo = LocalAuthRepository(db.localAuthDao())
 
     // ── Auth state ────────────────────────────────────────────────────────
-    private val _isLoggedIn       = MutableStateFlow(false)
+    private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
-    private val _currentUserName  = MutableStateFlow("")
+    private val _currentUserName = MutableStateFlow("")
     val currentUserName: StateFlow<String> = _currentUserName.asStateFlow()
 
-    private val _currentUserId    = MutableStateFlow("")
+    private val _currentUserId = MutableStateFlow("")
     val currentStudentId: StateFlow<String> = _currentUserId.asStateFlow()
 
-    private val _currentRole      = MutableStateFlow("STUDENT")
+    private val _currentRole = MutableStateFlow("STUDENT")
     val currentRole: StateFlow<String> = _currentRole.asStateFlow()
 
     fun login(username: String, password: String, role: String, onResult: (Boolean, String) -> Unit) {
-        // TODO: replace with FirebaseAuth.signInWithEmailAndPassword
-        if (username.isBlank() || password.isBlank()) {
+        val u = username.trim()
+        val p = password
+
+        if (u.isBlank() || p.isBlank()) {
             onResult(false, "Please fill in all fields")
             return
         }
 
-        val demo = DEMO_USERS[username.trim().lowercase()]
-        when {
-            demo == null -> onResult(false, "Username not found")
-            demo.second != password -> onResult(false, "Incorrect password")
-            demo.third.uppercase() != role.uppercase() -> onResult(false, "Wrong role selected for this account")
-            else -> {
-                _currentUserId.value   = username.trim().lowercase()
-                _currentUserName.value = demo.first
-                _currentRole.value     = demo.third
-                _isLoggedIn.value      = true
+        viewModelScope.launch {
+            try {
+                // ✅ do DB work off main thread
+                val acct = withContext(Dispatchers.IO) {
+                    authRepo.login(u, p)
+                }
+
+                _currentRole.value = role.uppercase()
+
+                _currentUserId.value = acct.username
+                _currentUserName.value = acct.studentName
+                _isLoggedIn.value = true
+
+                LocalSession.save(getApplication(), acct.accountId)
+
                 onResult(true, "")
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "Login failed")
             }
         }
     }
 
+    fun signUp(username: String, password: String, studentName: String, role: String, onResult: (Boolean, String) -> Unit) {
+        val u = username.trim()
+        val p = password
+        val n = studentName.trim()
+
+        if (u.isBlank() || p.isBlank() || n.isBlank()) {
+            onResult(false, "Please fill in all fields")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val acct = withContext(Dispatchers.IO) {
+                    authRepo.signUp(u, p, n)
+                }
+
+                // log them in immediately after sign up (optional)
+                _currentUserId.value = acct.username
+                _currentUserName.value = acct.studentName
+                _currentRole.value = role.uppercase()
+                _isLoggedIn.value = true
+
+                LocalSession.save(getApplication(), acct.accountId)
+
+                onResult(true, "")
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "Sign up failed")
+            }
+        }
+    }
+
+    // --- hashing helpers ---
+    private fun hashPassword(raw: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val bytes = md.digest(raw.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun verifyPassword(raw: String, storedHash: String): Boolean {
+        return hashPassword(raw) == storedHash
+    }
+
     fun logout() {
-        auth.signOut()
-        _isLoggedIn.value      = false
-        _currentRole.value     = "STUDENT"
+        LocalSession.logout(getApplication())
+        _isLoggedIn.value = false
+        _currentRole.value = "STUDENT"
         _currentUserName.value = ""
-        _currentUserId.value   = ""
+        _currentUserId.value = ""
     }
 
     // ── Sessions ──────────────────────────────────────────────────────────
     val sessions = repo.observeSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     // ── Leave requests ────────────────────────────────────────────────────
     val leaveRequests = repo.observeMyLeaveRequests()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -97,18 +159,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _lastCheckInResult = MutableStateFlow<AttendanceEntity?>(null)
     val lastCheckInResult: StateFlow<AttendanceEntity?> = _lastCheckInResult.asStateFlow()
 
-    fun submitCheckIn(
-        session: SessionEntity,
-        scannedQr: String?,
-        enteredPin: String?,
-        location: Location?,
-        photoUri: String?
-    ) {
+
+    fun submitCheckIn(session: SessionEntity, scannedQr: String?, enteredPin: String?, location: Location?, photoUri: String?) {
         viewModelScope.launch {
             val att = repo.checkIn(session, scannedQr, enteredPin, location, photoUri)
             _lastCheckInResult.value = att
         }
     }
+
 
     fun clearCheckInResult() { _lastCheckInResult.value = null }
 

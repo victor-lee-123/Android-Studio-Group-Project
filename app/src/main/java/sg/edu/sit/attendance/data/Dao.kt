@@ -1,6 +1,7 @@
 package sg.edu.sit.attendance.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -15,6 +16,14 @@ interface AttendanceDao {
 
     @Query("SELECT * FROM users WHERE uid = :uid LIMIT 1")
     suspend fun getUser(uid: String): UserEntity?
+
+    // Account Entity
+    // data/AttendanceDao.kt (or a separate AccountDao)
+    @Query("SELECT * FROM accounts WHERE username = :username LIMIT 1")
+    suspend fun getAccount(username: String): AccountEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAccount(acct: AccountEntity)
 
     // ── Groups ──
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -34,7 +43,13 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAttendance(att: AttendanceEntity)
 
-    @Query("SELECT * FROM attendance WHERE syncStatus = 'PENDING' ORDER BY createdAtMs ASC LIMIT :limit")
+    // IMPORTANT: allow FAILED to retry syncing
+    @Query("""
+        SELECT * FROM attendance
+        WHERE syncStatus IN ('PENDING','FAILED')
+        ORDER BY createdAtMs ASC
+        LIMIT :limit
+    """)
     suspend fun getPendingAttendance(limit: Int = 50): List<AttendanceEntity>
 
     @Query("UPDATE attendance SET syncStatus = :newStatus WHERE attendanceId = :id")
@@ -47,14 +62,18 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertLeaveRequest(req: LeaveRequestEntity)
 
-    // ADD THIS LINE BELOW
-    @androidx.room.Delete
+    @Delete
     suspend fun deleteLeaveRequest(req: LeaveRequestEntity)
 
     @Query("SELECT * FROM leave_requests WHERE userUid = :uid ORDER BY createdAtMs DESC")
     fun observeMyLeaveRequests(uid: String): Flow<List<LeaveRequestEntity>>
 
-    @Query("SELECT * FROM leave_requests WHERE syncStatus = 'PENDING' ORDER BY createdAtMs ASC")
+    // IMPORTANT: allow FAILED to retry syncing
+    @Query("""
+        SELECT * FROM leave_requests
+        WHERE syncStatus IN ('PENDING','FAILED')
+        ORDER BY createdAtMs ASC
+    """)
     suspend fun getPendingLeaveRequests(): List<LeaveRequestEntity>
 
     @Query("UPDATE leave_requests SET syncStatus = :newStatus WHERE leaveId = :id")

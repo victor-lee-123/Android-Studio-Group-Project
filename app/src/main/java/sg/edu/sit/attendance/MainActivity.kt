@@ -58,6 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import sg.edu.sit.attendance.auth.LocalAuthRepository
 
 //  Theme System
 // ThemeMode controls which color set the app uses.
@@ -209,6 +210,7 @@ val ShimmerHigh   = DarkColors.shimmerHigh
 sealed class Screen {
     // Student flow
     object Login           : Screen()
+    object SignUp          : Screen()
     object Dashboard       : Screen()
     object CheckIn         : Screen()
     object QrScan          : Screen()
@@ -257,6 +259,7 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
     val sessions      by vm.sessions.collectAsState()
     val leaveList     by vm.leaveRequests.collectAsState()
     val checkInResult by vm.lastCheckInResult.collectAsState()
+    var loginError by remember { mutableStateOf("") }
 
     // Theme
     // Read the saved theme preference from shared preferences
@@ -389,15 +392,23 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
                     },
                     label = "nav"
                 ) { screen ->
-                    when (screen) {
-                        Screen.Login -> LoginScreen { id, pwd, role ->
-                            vm.login(id, pwd, role) { ok, _ ->
-                                if (ok) {
-                                    if (role.uppercase() == "PROFESSOR") goTo(Screen.ProfDashboard)
-                                    else goTo(Screen.Dashboard)
+                    when (screen)
+                    {
+                        Screen.Login -> LoginScreen(
+                            loginError = loginError,
+                            onLogin = { id, pwd, role ->
+                                vm.login(id, pwd, role) { ok, msg ->
+                                    if (ok) {
+                                        loginError = ""
+                                        if (role.uppercase() == "PROFESSOR") goTo(Screen.ProfDashboard)
+                                        else goTo(Screen.Dashboard)
+                                    } else {
+                                        loginError = msg
+                                    }
                                 }
-                            }
-                        }
+                            },
+                            onSignUp = { goTo(Screen.SignUp) }
+                        )
                         Screen.Dashboard -> DashboardScreen(
                             vm           = vm,
                             sessions     = sessions,
@@ -478,6 +489,10 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
                         Screen.AttendanceList -> AttendanceListScreen(
                             session = selectedSession!!,
                             onBack  = { goTo(Screen.ClassAccess) }
+                        )
+                        Screen.SignUp -> SignUpScreen(
+                            onDone = { goTo(Screen.Login) },
+                            onBack = { goTo(Screen.Login) }
                         )
                     }
                 }
@@ -604,12 +619,13 @@ fun DigiTextField(value: String, onValueChange: (String) -> Unit, placeholder: S
 // It lets the user choose between Student and Professor roles,
 // enter their username and password, and tap Sign In.
 // The background uses the navy header color so both light and dark modes look consistent.
-fun LoginScreen(onLogin: (String, String, String) -> Unit) {
+fun LoginScreen(loginError: String, onLogin: (String, String, String) -> Unit,
+                onSignUp: () -> Unit) {
     var studentId by remember { mutableStateOf("") }
     var password  by remember { mutableStateOf("") }
     var role      by remember { mutableStateOf("Student") }
-    var errorMsg  by remember { mutableStateOf("") }
 
+    // REMOVE local errorMsg state, use loginError instead
     val C = LocalColors.current
     Box(Modifier.fillMaxSize()
         .background(Brush.verticalGradient(listOf(C.headerGradientTop, C.headerGradientTop, C.bgPage)))) {
@@ -646,8 +662,8 @@ fun LoginScreen(onLogin: (String, String, String) -> Unit) {
 
             Spacer(Modifier.height(24.dp))
 
-            FieldLabel("USERNAME")
-            DigiTextField(studentId, { studentId = it }, if (role == "Student") "alex.t" else "rajan.a",
+            FieldLabel("EMAIL")
+            DigiTextField(studentId, { studentId = it }, if (role == "Student") "Enter your email" else "Enter your email",
                 leadingIcon = { Icon(Icons.Default.Person, null, tint = C.textMuted) })
 
             Spacer(Modifier.height(16.dp))
@@ -672,18 +688,23 @@ fun LoginScreen(onLogin: (String, String, String) -> Unit) {
                 isPassword = true, keyboardType = KeyboardType.Password,
                 leadingIcon = { Icon(Icons.Default.Lock, null, tint = C.textMuted) })
 
-            if (errorMsg.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
-                Text(errorMsg, color = C.digiRed, fontSize = 13.sp)
-            }
-
-            Spacer(Modifier.height(28.dp))
-
             DigiButton("Sign In", modifier = Modifier.fillMaxWidth(), onClick = {
-                if (studentId.isBlank() || password.isBlank()) { errorMsg = "Please fill in all fields"; return@DigiButton }
-                errorMsg = ""
+                if (studentId.isBlank() || password.isBlank()) return@DigiButton
                 onLogin(studentId, password, role)
             })
+
+            if (loginError.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text(loginError, color = C.digiRed, fontSize = 13.sp)
+            }
+
+            Spacer(Modifier.height(10.dp))
+            TextButton(
+                onClick = onSignUp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Sign Up", color = C.digiRed, fontWeight = FontWeight.SemiBold)
+            }
 
             Spacer(Modifier.height(16.dp))
             // DEV HINT
@@ -1914,6 +1935,145 @@ fun ProfDashboardScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun SignUpScreen(
+    onDone: () -> Unit,
+    onBack: () -> Unit
+) {
+    val ctx = LocalContext.current
+    val C = LocalColors.current
+
+    // We keep your same fields/UI.
+    // IMPORTANT: We'll treat "email" as the local username (since you don't want Firebase).
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var studentName by remember { mutableStateOf("") }
+
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var success by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    // Local Room auth repo
+    val db = remember { DbProvider.get(ctx) }
+    val authRepo = remember { LocalAuthRepository(db.localAuthDao()) }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(C.headerGradientTop, C.headerGradientTop, C.bgPage)))
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 28.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Spacer(Modifier.height(18.dp))
+        DigiTopBar(title = "Sign Up", onBack = onBack)
+
+        Spacer(Modifier.height(18.dp))
+
+        Text("Create Account", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text("Use email + password", color = Color.White.copy(0.7f), fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+
+        Spacer(Modifier.height(24.dp))
+
+        FieldLabel("STUDENT NAME")
+        DigiTextField(
+            value = studentName,
+            onValueChange = { studentName = it },
+            placeholder = "e.g. Alex Tan",
+            leadingIcon = { Icon(Icons.Default.Person, null, tint = C.textMuted) }
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        FieldLabel("EMAIL")
+        DigiTextField(
+            value = email,
+            onValueChange = { email = it.trim() },
+            placeholder = "e.g. alex@email.com",
+            keyboardType = KeyboardType.Email,
+            leadingIcon = { Icon(Icons.Default.Email, null, tint = C.textMuted) }
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        FieldLabel("PASSWORD")
+        DigiTextField(
+            value = password,
+            onValueChange = { password = it },
+            placeholder = "Min 6 characters",
+            isPassword = true,
+            keyboardType = KeyboardType.Password,
+            leadingIcon = { Icon(Icons.Default.Lock, null, tint = C.textMuted) }
+        )
+
+        if (error != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(error!!, color = C.digiRed, fontSize = 13.sp)
+        }
+
+        if (success) {
+            Spacer(Modifier.height(10.dp))
+            Text("✅ Account created! Please sign in.", color = C.successGreen, fontSize = 13.sp)
+        }
+
+        Spacer(Modifier.height(22.dp))
+
+        DigiButton(
+            text = if (loading) "Creating..." else "Create Account",
+            enabled = !loading,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                error = null
+                success = false
+
+                // validation (same as your original)
+                if (studentName.isBlank() || email.isBlank() || password.isBlank()) {
+                    error = "Please fill in all fields"
+                    return@DigiButton
+                }
+                if (password.length < 6) {
+                    error = "Password must be at least 6 characters"
+                    return@DigiButton
+                }
+
+                loading = true
+                scope.launch {
+                    try {
+                        // No Firebase: store in local Room table "local_accounts"
+                        authRepo.signUp(
+                            username = email.trim(),          // treat email as username
+                            password = password,
+                            studentName = studentName.trim()
+                        )
+
+                        success = true
+                        kotlinx.coroutines.delay(600)
+                        onDone() // go back to login screen
+                    } catch (e: Exception) {
+                        error = e.message ?: "Sign up failed"
+                    } finally {
+                        loading = false
+                    }
+                }
+            }
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        TextButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Back to Sign In", color = Color.White.copy(0.75f))
+        }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
