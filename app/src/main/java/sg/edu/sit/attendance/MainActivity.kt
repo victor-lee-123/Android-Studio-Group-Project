@@ -7,6 +7,7 @@ import android.annotation.SuppressLint
 import android.location.Location
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.SideEffect
 import androidx.core.view.WindowCompat
@@ -1418,10 +1419,21 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
         }.timeInMillis
     }
 
+    // Boundary to allow backdating by 1 day
+    val yesterdayStart = remember {
+        Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -1)
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
     var startMs by remember { mutableStateOf(todayStart) }
     var endMs by remember { mutableStateOf(todayStart + 86_400_000L) }
     var selCodes by remember { mutableStateOf(setOf<String>()) }
     var remarks by remember { mutableStateOf("") }
+
+    // NEW: State to hold the selected file URI
+    var documentUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var validationError by remember { mutableStateOf("") }
 
     val submitState by vm.leaveSubmitState.collectAsState()
@@ -1430,6 +1442,13 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
             vm.clearLeaveSubmitState()
             onSubmitted()
         }
+    }
+
+    // NEW: The file picker launcher
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        documentUri = uri // Save the selected file URI
     }
 
     val C = LocalColors.current
@@ -1497,21 +1516,17 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
             Column {
                 FieldLabel("DURATION")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Start Date Button
                     Box(Modifier.weight(1f).background(C.bgSurface2, RoundedCornerShape(12.dp))
                         .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp))
-                        .clickable { showStartDatePicker = true }
-                        .padding(14.dp)) {
+                        .clickable { showStartDatePicker = true }.padding(14.dp)) {
                         Column {
                             Text("From", color = C.textMuted, fontSize = 10.sp)
                             Text(fmtDateLong(startMs), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                    // End Date Button
                     Box(Modifier.weight(1f).background(C.bgSurface2, RoundedCornerShape(12.dp))
                         .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp))
-                        .clickable { showEndDatePicker = true }
-                        .padding(14.dp)) {
+                        .clickable { showEndDatePicker = true }.padding(14.dp)) {
                         Column {
                             Text("To", color = C.textMuted, fontSize = 10.sp)
                             Text(fmtDateLong(endMs), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -1539,6 +1554,39 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
                 }
             }
 
+            // NEW: File Upload Box
+            Column {
+                FieldLabel("SUPPORTING DOCUMENT (OPTIONAL)")
+                Box(Modifier.fillMaxWidth().background(C.bgSurface2, RoundedCornerShape(12.dp))
+                    .border(1.dp, if (documentUri != null) C.successGreen else C.dividerColor, RoundedCornerShape(12.dp))
+                    .clickable {
+                        // "*/*" allows all file types. You can restrict it using "image/*" or "application/pdf"
+                        filePickerLauncher.launch("*/*")
+                    }
+                    .padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (documentUri != null) "📎" else "📁", fontSize = 24.sp)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = if (documentUri != null) "Document Attached" else "Upload Medical Certificate",
+                                color = if (documentUri != null) C.successGreen else C.textPrimary,
+                                fontSize = 14.sp, fontWeight = FontWeight.SemiBold
+                            )
+                            if (documentUri == null) {
+                                Text("Tap to browse files or images", color = C.textMuted, fontSize = 12.sp)
+                            }
+                        }
+                        if (documentUri != null) {
+                            // Let the user clear the attachment if they selected the wrong one
+                            IconButton(onClick = { documentUri = null }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Clear, "Remove File", tint = C.textMuted)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Remarks
             Column {
                 FieldLabel("REMARKS (OPTIONAL)")
@@ -1554,14 +1602,14 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
                 text = if (submitState is LeaveSubmitState.Loading) "Submitting..." else "Submit Request",
                 enabled = submitState !is LeaveSubmitState.Loading,
                 onClick = {
-                    // Strict Validation Logic
                     when {
-                        startMs < todayStart -> validationError = "❌ Cannot request leave for past dates."
+                        startMs < yesterdayStart -> validationError = "❌ Cannot request leave older than 1 day."
                         endMs < startMs -> validationError = "❌ 'To' date cannot be before 'From' date."
                         selCodes.isEmpty() -> validationError = "❌ Please select at least one affected class."
                         else -> {
                             validationError = ""
-                            vm.submitLeaveRequest(leaveType, startMs, endMs, selCodes.toList(), remarks, null)
+                            // NEW: Pass documentUri?.toString() instead of null
+                            vm.submitLeaveRequest(leaveType, startMs, endMs, selCodes.toList(), remarks, documentUri?.toString())
                         }
                     }
                 },
