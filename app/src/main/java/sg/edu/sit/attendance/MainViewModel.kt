@@ -25,15 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sg.edu.sit.attendance.auth.LocalSession
 
-// ── Demo credentials ─────────────────────────────────────────────────────────
-// Student:   username = alex.t      password = password123
-// Professor: username = rajan.a     password = password123
-// (These are checked locally for testing; replace with FirebaseAuth later)
-private val DEMO_USERS = mapOf(
-    "alex.t"    to Triple("Alex Tan",   "password123", "STUDENT"),
-    "rajan.a"   to Triple("Dr. Rajan",  "password123", "PROFESSOR")
-)
-
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // Inside MainViewModel.kt

@@ -688,6 +688,8 @@ fun LoginScreen(loginError: String, onLogin: (String, String, String) -> Unit,
                 isPassword = true, keyboardType = KeyboardType.Password,
                 leadingIcon = { Icon(Icons.Default.Lock, null, tint = C.textMuted) })
 
+            Spacer(Modifier.height(24.dp))
+
             DigiButton("Sign In", modifier = Modifier.fillMaxWidth(), onClick = {
                 if (studentId.isBlank() || password.isBlank()) return@DigiButton
                 onLogin(studentId, password, role)
@@ -705,19 +707,6 @@ fun LoginScreen(loginError: String, onLogin: (String, String, String) -> Unit,
             ) {
                 Text("Sign Up", color = C.digiRed, fontWeight = FontWeight.SemiBold)
             }
-
-            Spacer(Modifier.height(16.dp))
-            // DEV HINT
-            Box(Modifier.fillMaxWidth().background(C.bgSurface2, RoundedCornerShape(10.dp))
-                .border(1.dp, C.dividerColor, RoundedCornerShape(10.dp)).padding(12.dp)) {
-                Column {
-                    Text("🧪  Test accounts", color = C.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Student:   alex.t  /  password123", color = C.textSecondary, fontSize = 11.sp)
-                    Text("Professor: rajan.a  /  password123", color = C.textSecondary, fontSize = 11.sp)
-                }
-            }
-            Spacer(Modifier.height(40.dp))
         }
     }
 }

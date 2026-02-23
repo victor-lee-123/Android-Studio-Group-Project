@@ -17,7 +17,7 @@ data class UserEntity(
     val createdAtMs: Long = System.currentTimeMillis()
 )
 
-// data/AccountEntity.kt
+// Accounts entity for storing future cloud usage
 @Entity(tableName = "accounts")
 data class AccountEntity(
     @PrimaryKey val username: String,
