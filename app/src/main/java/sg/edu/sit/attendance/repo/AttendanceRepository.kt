@@ -118,4 +118,10 @@ class AttendanceRepository(private val context: Context) {
         WorkEnqueue.enqueueSync(context)
         return req
     }
+
+    // ── Delete Leave Request ──────────────────────────────────────────────
+    suspend fun deleteLeaveRequest(leave: LeaveRequestEntity) {
+        dao.deleteLeaveRequest(leave) // Calls the DAO to remove from local DB
+        WorkEnqueue.enqueueSync(context) // Optional: triggers sync to remove from remote DB
+    }
 }

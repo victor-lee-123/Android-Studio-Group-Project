@@ -455,6 +455,7 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
                         )
                         Screen.LeaveList -> LeaveListScreen(
                             leaveList  = leaveList,
+                            vm         = vm,
                             onBack     = { goTo(Screen.Dashboard) },
                             onNewLeave = { goTo(Screen.LeaveForm) }
                         )
@@ -845,7 +846,18 @@ fun DashboardScreen(
                             }
                         }
                     } else {
-                        leaveList.forEach { LeaveCardFull(it); Spacer(Modifier.height(10.dp)) }
+                        leaveList.forEach { leave ->
+                            LeaveCardFull(
+                                leave = leave,
+                                onDelete = {
+                                    // Since this is just a summary view on the Dashboard,
+                                    // you might want to navigate the user to the full Leave List
+                                    // or simply trigger the viewmodel delete function.
+                                    vm.deleteLeaveRequest(leave)
+                                }
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
                     }
                     Spacer(Modifier.height(24.dp))
                 }
@@ -1565,26 +1577,62 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
 // LeaveListScreen shows all leave requests the student has submitted.
 // If there are no requests yet it shows an empty state with a prompt to create one.
 // There is a plus button in the top bar to go to the leave form.
-fun LeaveListScreen(leaveList: List<LeaveRequestEntity>, onBack: () -> Unit, onNewLeave: () -> Unit) {
+fun LeaveListScreen(
+    leaveList: List<LeaveRequestEntity>,
+    vm: MainViewModel,
+    onBack: () -> Unit,
+    onNewLeave: () -> Unit
+) {
     val C = LocalColors.current
+    // This state controls the visibility of the prompt
+    var leaveToDelete by remember { mutableStateOf<LeaveRequestEntity?>(null) }
+
+    // ── Confirmation Dialog ──
+    if (leaveToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { leaveToDelete = null },
+            title = { Text("Delete Request?", color = C.textPrimary) },
+            text = { Text("Are you sure you want to delete this leave request? This action cannot be undone.", color = C.textSecondary) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        leaveToDelete?.let { vm.deleteLeaveRequest(it) } // Calls ViewModel to delete
+                        leaveToDelete = null // Close dialog
+                    }
+                ) {
+                    Text("Delete", color = C.digiRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { leaveToDelete = null }) {
+                    Text("Cancel", color = C.textPrimary)
+                }
+            },
+            containerColor = C.bgCard
+        )
+    }
+
     Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("My Leave", onBack) {
-            IconButton(onClick = onNewLeave) { Icon(Icons.Default.Add, null, tint = C.digiRed) }
+            IconButton(onClick = onNewLeave) {
+                Icon(Icons.Default.Add, null, tint = C.digiRed)
+            }
         }
 
         if (leaveList.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("📄", fontSize = 48.sp); Spacer(Modifier.height(12.dp))
-                    Text("No Leave Requests", color = C.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    Text("Tap + to submit a new request", color = C.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
-                }
+                Text("No Leave Requests", color = C.textSecondary)
             }
         } else {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Spacer(Modifier.height(4.dp))
-                leaveList.forEach { LeaveCardFull(it) }
+                leaveList.forEach { leave ->
+                    LeaveCardFull(
+                        leave = leave,
+                        onDelete = { leaveToDelete = leave } // Trigger the dialog
+                    )
+                }
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -1596,32 +1644,67 @@ fun LeaveListScreen(leaveList: List<LeaveRequestEntity>, onBack: () -> Unit, onN
 // It shows the affected courses, leave type, date range, document status,
 // and the reason if the request was rejected or who approved it if it was approved.
 // A colored left border indicates the status at a glance.
-fun LeaveCardFull(leave: LeaveRequestEntity) {
+fun LeaveCardFull(
+    leave: LeaveRequestEntity,
+    onDelete: () -> Unit
+) {
     val C = LocalColors.current
-    val (sc, sb, sbd) = leaveStatusColors(leave.status)
+    val (sc, sb, sbd) = leaveStatusColors(leave.status) //
+
     Box(Modifier.fillMaxWidth().background(C.bgCard, RoundedCornerShape(16.dp)).border(1.dp, C.dividerColor, RoundedCornerShape(16.dp))) {
+        // Colored status indicator strip on the left
         Box(Modifier.width(4.dp).fillMaxHeight().background(sc, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)).align(Alignment.CenterStart))
+
         Column(Modifier.fillMaxWidth().padding(start = 18.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(leave.affectedCourseCodes.split(",").joinToString(" · "), color = C.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text(leave.leaveType, color = C.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
                 }
-                Box(Modifier.background(sb, RoundedCornerShape(20.dp)).border(1.dp, sbd, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text(leave.status.lowercase().replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Trash icon for deletion
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Request",
+                            tint = C.textMuted
+                        )
+                    }
+
+                    // Status Badge
+                    Box(Modifier.background(sb, RoundedCornerShape(20.dp)).border(1.dp, sbd, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text(leave.status.lowercase().replaceFirstChar { it.uppercase() }, color = sc, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
+
             HorizontalDivider(color = C.dividerColor, modifier = Modifier.padding(vertical = 10.dp))
+
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("📅", fontSize = 13.sp); Spacer(Modifier.width(6.dp))
+                Text("📅", fontSize = 13.sp)
+                Spacer(Modifier.width(6.dp))
                 Text("${fmtDateLong(leave.startDateMs)} – ${fmtDateLong(leave.endDateMs)}", color = C.textSecondary, fontSize = 12.sp)
             }
+
             if (leave.documentUri != null) {
                 Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) { Text("📎", fontSize = 13.sp); Spacer(Modifier.width(6.dp)); Text("Document attached", color = C.textMuted, fontSize = 12.sp) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📎", fontSize = 13.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Document attached", color = C.textMuted, fontSize = 12.sp)
+                }
             }
-            if (leave.status == "REJECTED" && leave.rejectionReason != null) { Spacer(Modifier.height(6.dp)); Text("✕ ${leave.rejectionReason}", color = C.digiRed, fontSize = 12.sp) }
-            if (leave.status == "APPROVED" && leave.reviewedBy != null) { Spacer(Modifier.height(6.dp)); Text("✓ Approved by ${leave.reviewedBy}", color = C.successGreen, fontSize = 12.sp) }
+
+            if (leave.status == "REJECTED" && leave.rejectionReason != null) {
+                Spacer(Modifier.height(6.dp))
+                Text("✕ ${leave.rejectionReason}", color = C.digiRed, fontSize = 12.sp)
+            }
+
+            if (leave.status == "APPROVED" && leave.reviewedBy != null) {
+                Spacer(Modifier.height(6.dp))
+                Text("✓ Approved by ${leave.reviewedBy}", color = C.successGreen, fontSize = 12.sp)
+            }
         }
     }
 }

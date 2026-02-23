@@ -27,6 +27,18 @@ private val DEMO_USERS = mapOf(
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
+    // Inside MainViewModel.kt
+    fun deleteLeaveRequest(leave: LeaveRequestEntity) {
+        viewModelScope.launch {
+            try {
+                repo.deleteLeaveRequest(leave)
+                // Optionally: clear state or show a toast if needed
+            } catch (e: Exception) {
+                // Handle error (e.g., log it or show a message)
+            }
+        }
+    }
+
     private val repo = AttendanceRepository(app.applicationContext)
     private val auth = FirebaseAuth.getInstance()
 

@@ -47,6 +47,10 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertLeaveRequest(req: LeaveRequestEntity)
 
+    // ADD THIS LINE BELOW
+    @androidx.room.Delete
+    suspend fun deleteLeaveRequest(req: LeaveRequestEntity)
+
     @Query("SELECT * FROM leave_requests WHERE userUid = :uid ORDER BY createdAtMs DESC")
     fun observeMyLeaveRequests(uid: String): Flow<List<LeaveRequestEntity>>
 
