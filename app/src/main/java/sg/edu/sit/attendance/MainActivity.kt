@@ -1390,35 +1390,78 @@ fun CheckInSuccessScreen(
 //  LEAVE FORM
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-// LeaveFormScreen lets students submit a leave request.
-// They can choose a leave type, set a date range, select affected classes,
-// attach a supporting document, and add optional remarks.
-// Tapping Submit Request sends the request through the view model.
 fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: () -> Unit, onSubmitted: () -> Unit) {
     val leaveTypes = listOf("Medical Leave", "Compassionate Leave", "Personal Leave", "Other")
-    var leaveType    by remember { mutableStateOf(leaveTypes[0]) }
+    var leaveType by remember { mutableStateOf(leaveTypes[0]) }
     var typeExpanded by remember { mutableStateOf(false) }
-    val today        = System.currentTimeMillis()
-    var startMs      by remember { mutableStateOf(today) }
-    var endMs        by remember { mutableStateOf(today + 86_400_000L) }
-    var selCodes     by remember { mutableStateOf(setOf<String>()) }
-    var remarks      by remember { mutableStateOf("") }
 
-    // Watch the submit state from the view model
-    // When the request is submitted successfully we clear the state and go to the leave list
+    // State for Date Pickers
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+
+    // Midnight anchor for "Today" validation
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    var startMs by remember { mutableStateOf(todayStart) }
+    var endMs by remember { mutableStateOf(todayStart + 86_400_000L) }
+    var selCodes by remember { mutableStateOf(setOf<String>()) }
+    var remarks by remember { mutableStateOf("") }
+    var validationError by remember { mutableStateOf("") }
+
     val submitState by vm.leaveSubmitState.collectAsState()
     LaunchedEffect(submitState) {
-        if (submitState is LeaveSubmitState.Success) { vm.clearLeaveSubmitState(); onSubmitted() }
+        if (submitState is LeaveSubmitState.Success) {
+            vm.clearLeaveSubmitState()
+            onSubmitted()
+        }
     }
 
     val C = LocalColors.current
+
+    // --- Date Picker Dialogs ---
+    if (showStartDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startMs)
+        DatePickerDialog(
+            onDismissRequest = { showStartDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    startMs = datePickerState.selectedDateMillis ?: startMs
+                    showStartDatePicker = false
+                }) { Text("Confirm", color = C.digiRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showEndDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = endMs)
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    endMs = datePickerState.selectedDateMillis ?: endMs
+                    showEndDatePicker = false
+                }) { Text("Confirm", color = C.digiRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
     Column(Modifier.fillMaxSize().background(C.bgPage).statusBarsPadding().navigationBarsPadding()) {
         DigiTopBar("Leave Request", onBack)
 
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
-            // Dropdown to pick the type of leave being requested
+            // Leave Type Dropdown
             Column {
                 FieldLabel("LEAVE TYPE")
                 ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = it }) {
@@ -1432,88 +1475,84 @@ fun LeaveFormScreen(vm: MainViewModel, sessions: List<SessionEntity>, onBack: ()
                     ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false },
                         modifier = Modifier.background(C.bgCard)) {
                         leaveTypes.forEach { t ->
-                            DropdownMenuItem(text = { Text(t, color = C.textPrimary) }, onClick = { leaveType = t; typeExpanded = false },
-                                modifier = Modifier.background(if (t == leaveType) C.digiRedSoft else Color.Transparent))
+                            DropdownMenuItem(text = { Text(t, color = C.textPrimary) }, onClick = { leaveType = t; typeExpanded = false })
                         }
                     }
                 }
             }
 
-            // Date range picker for the leave duration
-            // Currently tapping adds one day each time, this should use a date picker dialog in production
+            // Date Selection UI
             Column {
                 FieldLabel("DURATION")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listOf("From" to startMs, "To" to endMs).forEachIndexed { i, (label, ms) ->
-                        Box(Modifier.weight(1f).background(C.bgSurface2, RoundedCornerShape(12.dp))
-                            .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp))
-                            .clickable { if (i == 0) startMs += 86_400_000L else endMs += 86_400_000L }
-                            .padding(14.dp)) {
-                            Column {
-                                Text(label, color = C.textMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
-                                Text(fmtDateLong(ms), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                            }
+                    // Start Date Button
+                    Box(Modifier.weight(1f).background(C.bgSurface2, RoundedCornerShape(12.dp))
+                        .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp))
+                        .clickable { showStartDatePicker = true }
+                        .padding(14.dp)) {
+                        Column {
+                            Text("From", color = C.textMuted, fontSize = 10.sp)
+                            Text(fmtDateLong(startMs), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    // End Date Button
+                    Box(Modifier.weight(1f).background(C.bgSurface2, RoundedCornerShape(12.dp))
+                        .border(1.dp, C.dividerColor, RoundedCornerShape(12.dp))
+                        .clickable { showEndDatePicker = true }
+                        .padding(14.dp)) {
+                        Column {
+                            Text("To", color = C.textMuted, fontSize = 10.sp)
+                            Text(fmtDateLong(endMs), color = C.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
 
-            // Classes affected
+            // Classes Affected
             Column {
                 FieldLabel("CLASSES AFFECTED")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val C = LocalColors.current
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                     sessions.forEach { s ->
                         val sel = s.courseCode in selCodes
-                        Box(Modifier.background(if (sel) C.digiRedSoft else C.bgSurface2, RoundedCornerShape(20.dp))
-                            .border(1.dp, if (sel) C.digiRedBorder else C.dividerColor, RoundedCornerShape(20.dp))
-                            .clickable { selCodes = if (sel) selCodes - s.courseCode else selCodes + s.courseCode }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)) {
-                            Text(s.courseCode, color = if (sel) C.digiRed else C.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-
-            // Placeholder for document upload such as an MC or approval letter
-            // The file picker is not implemented yet, marked as TODO
-            Column {
-                FieldLabel("SUPPORTING DOCUMENTS")
-                Box(Modifier.fillMaxWidth()
-                    .background(C.bgSurface2, RoundedCornerShape(12.dp))
-                    .drawBehind {
-                        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                            width = 2.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+                        FilterChip(
+                            selected = sel,
+                            onClick = { selCodes = if (sel) selCodes - s.courseCode else selCodes + s.courseCode },
+                            label = { Text(s.courseCode) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = C.digiRedSoft,
+                                selectedLabelColor = C.digiRed
+                            )
                         )
-                        val r = 12.dp.toPx()
-                        drawRoundRect(C.digiRedBorder, style = stroke, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
-                    }
-                    .clickable { /* TODO: file picker */ }.padding(20.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📎", fontSize = 24.sp)
-                        Spacer(Modifier.height(4.dp))
-                        Text("MC, letter, or other proof", color = C.textSecondary, fontSize = 12.sp)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Tap to upload", color = C.digiRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
 
-            // Optional remarks field for the student to add any extra notes
+            // Remarks
             Column {
                 FieldLabel("REMARKS (OPTIONAL)")
-                DigiTextField(remarks, { remarks = it }, "Add any additional notes…",
-                    singleLine = false, minLines = 3, modifier = Modifier.fillMaxWidth())
+                DigiTextField(remarks, { remarks = it }, "Add any additional notes…", singleLine = false, minLines = 3)
             }
 
-            if (submitState is LeaveSubmitState.Error)
-                Text((submitState as LeaveSubmitState.Error).message, color = C.digiRed, fontSize = 13.sp)
+            // Validation and Submission
+            if (validationError.isNotBlank()) {
+                Text(validationError, color = C.digiRed, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
 
             DigiButton(
-                text = if (submitState is LeaveSubmitState.Loading) "Submitting…" else "Submit Request",
+                text = if (submitState is LeaveSubmitState.Loading) "Submitting..." else "Submit Request",
                 enabled = submitState !is LeaveSubmitState.Loading,
-                onClick = { vm.submitLeaveRequest(leaveType, startMs, endMs, selCodes.toList(), remarks, null) },
+                onClick = {
+                    // Strict Validation Logic
+                    when {
+                        startMs < todayStart -> validationError = "❌ Cannot request leave for past dates."
+                        endMs < startMs -> validationError = "❌ 'To' date cannot be before 'From' date."
+                        selCodes.isEmpty() -> validationError = "❌ Please select at least one affected class."
+                        else -> {
+                            validationError = ""
+                            vm.submitLeaveRequest(leaveType, startMs, endMs, selCodes.toList(), remarks, null)
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(16.dp))
