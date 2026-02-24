@@ -1,6 +1,6 @@
-# 📱 DigiCheck – Smart Attendance Verification App
+# 📱 CheckIn@DP – Smart Attendance Verification App
 
-DigiCheck is an Android-based smart attendance system built using **Kotlin and Jetpack Compose**.  
+CheckIn@DP is an Android-based smart attendance system built using **Kotlin and Jetpack Compose**.  
 The application verifies student attendance using **QR session validation, geofence proximity checks, selfie photo proof, and local authentication**, following an **offline-first architecture** powered by Room database.
 
 ---
