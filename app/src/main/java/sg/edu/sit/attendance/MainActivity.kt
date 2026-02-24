@@ -328,7 +328,7 @@ fun DigiCheckApp(vm: MainViewModel = viewModel()) {
             dao.upsertSession(SessionEntity(
                 sessionId = "s2", groupId = "g2", courseCode = "CSD3156", title = "Software Engineering",
                 room = "Room 4B-02", startTimeMs = now - 30 * 60_000L, endTimeMs = now + 90 * 60_000L,
-                fenceLat = 1.4123, fenceLng = 103.9087, fenceRadiusM = 300f,
+                fenceLat = 1.4123, fenceLng = 103.9087, fenceRadiusM = 3000f,
                 qrCodePayload = "ATTEND:s2", classPassword = "472819", createdByUid = "prof"
             ))
             // Session s3 is an afternoon class that has not started yet
