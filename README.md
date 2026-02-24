@@ -72,4 +72,74 @@ The application follows the **Model–View–ViewModel (MVVM)** pattern.
 | Data Layer (Room) | Local persistence and structured queries |
 | Infrastructure | CameraX, ML Kit, Location Services |
 
-### Data Flow
+## 🗂 Database
+
+- **Database Name:** `attendance.db`
+- **Storage Location:** Internal app storage (private sandbox)
+- /data/data/sg.edu.sit.attendance/databases/attendance.db
+- The database is local-only and removed when the app is uninstalled.
+
+---
+
+## 🛠 Tech Stack
+
+| Technology | Purpose |
+|------------|----------|
+| Kotlin | Primary programming language |
+| Jetpack Compose | Declarative UI framework |
+| Room (SQLite) | Local persistence layer |
+| Kotlin Coroutines | Asynchronous programming |
+| StateFlow / Flow | Reactive state management |
+| CameraX | Camera preview & capture |
+| ML Kit (Barcode) | QR code detection |
+| Coil | Image loading |
+| WorkManager (optional) | Background sync tasks |
+
+---
+
+## 🔒 Security Design
+
+- Passwords hashed using **PBKDF2WithHmacSHA256**
+- Unique salt generated per account
+- No plaintext password storage
+- Local session stored securely in SharedPreferences
+
+---
+
+## 📶 Offline-First Design
+
+The app is designed to function without internet connectivity:
+
+- Sessions stored locally
+- Attendance saved immediately
+- Leave requests persisted locally
+- Authentication handled locally
+
+Future extension: remote synchronization via Firebase or backend API.
+
+---
+
+## 🧪 Attendance Verification Flow
+
+1. Validate geofence proximity  
+2. Validate QR session payload or PIN  
+3. Capture selfie photo proof  
+4. Persist attendance record in Room  
+5. Reactive UI update  
+
+---
+
+## 📌 Future Improvements
+
+- Remote sync integration
+- Professor analytics dashboard
+- Biometric authentication
+- Cloud backup
+- Role-based access control
+
+---
+
+## 📜 License
+
+For academic and educational use.
+
