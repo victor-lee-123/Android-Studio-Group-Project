@@ -141,5 +141,5 @@ Future extension: remote synchronization via Firebase or backend API.
 
 ## 📜 License
 
-For academic and educational use.
+For academic and educational use. Created by students from Singapore Institute of Technology (SIT). All Rights Reserved 2026.
 
